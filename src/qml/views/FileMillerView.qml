@@ -495,6 +495,36 @@ FocusScope {
                 root.updatePreview()
             }
 
+            // Reconcile index-based selection/cursor when the model adds or
+            // removes rows, so files moved out of this column stop carrying a
+            // stale highlight.
+            function reconcileAfterRemove(first, last) {
+                var count = last - first + 1
+                var newSel = []
+                for (var i = 0; i < selectedIndices.length; ++i) {
+                    var idx = selectedIndices[i]
+                    if (idx < first) newSel.push(idx)
+                    else if (idx > last) newSel.push(idx - count)
+                }
+                selectedIndices = newSel
+                if (cursorIndex > last) cursorIndex -= count
+                else if (cursorIndex >= first) cursorIndex = -1
+                if (lastSelectedIndex > last) lastSelectedIndex -= count
+                else if (lastSelectedIndex >= first) lastSelectedIndex = -1
+            }
+
+            function reconcileAfterInsert(first, last) {
+                var count = last - first + 1
+                var newSel = []
+                for (var i = 0; i < selectedIndices.length; ++i) {
+                    var idx = selectedIndices[i]
+                    newSel.push(idx >= first ? idx + count : idx)
+                }
+                selectedIndices = newSel
+                if (cursorIndex >= first) cursorIndex += count
+                if (lastSelectedIndex >= first) lastSelectedIndex += count
+            }
+
             function moveSelection(delta, extend) {
                 if (count <= 0) return
                 var current = cursorIndex >= 0 ? cursorIndex
@@ -652,8 +682,17 @@ FocusScope {
             Connections {
                 target: root.fileModel
                 ignoreUnknownSignals: true
-                function onModelReset() { currentColumn.schedulePendingFocus() }
-                function onRowsInserted() { currentColumn.schedulePendingFocus() }
+                function onModelReset() {
+                    currentColumn.clearSelection()
+                    currentColumn.schedulePendingFocus()
+                }
+                function onRowsInserted(_p, first, last) {
+                    currentColumn.reconcileAfterInsert(first, last)
+                    currentColumn.schedulePendingFocus()
+                }
+                function onRowsRemoved(_p, first, last) {
+                    currentColumn.reconcileAfterRemove(first, last)
+                }
             }
 
             Keys.onUpPressed: (event) => moveSelection(-1, event.modifiers & Qt.ShiftModifier)

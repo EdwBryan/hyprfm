@@ -133,6 +133,36 @@ FocusScope {
         cursorIndex = -1
     }
 
+    // Selection/cursor are model row indices. Reconcile them when the model
+    // inserts/removes rows so files moved out of this directory stop dragging
+    // a stale highlight (and surviving rows keep the right one).
+    function reconcileAfterRemove(first, last) {
+        var count = last - first + 1
+        var newSel = []
+        for (var i = 0; i < selectedIndices.length; ++i) {
+            var idx = selectedIndices[i]
+            if (idx < first) newSel.push(idx)
+            else if (idx > last) newSel.push(idx - count)
+        }
+        selectedIndices = newSel
+        if (cursorIndex > last) cursorIndex -= count
+        else if (cursorIndex >= first) cursorIndex = -1
+        if (lastSelectedIndex > last) lastSelectedIndex -= count
+        else if (lastSelectedIndex >= first) lastSelectedIndex = -1
+    }
+
+    function reconcileAfterInsert(first, last) {
+        var count = last - first + 1
+        var newSel = []
+        for (var i = 0; i < selectedIndices.length; ++i) {
+            var idx = selectedIndices[i]
+            newSel.push(idx >= first ? idx + count : idx)
+        }
+        selectedIndices = newSel
+        if (cursorIndex >= first) cursorIndex += count
+        if (lastSelectedIndex >= first) lastSelectedIndex += count
+    }
+
     function pathForRow(row) {
         if (!viewModel || row < 0)
             return ""
@@ -1036,11 +1066,18 @@ FocusScope {
         ignoreUnknownSignals: true
 
         function onModelReset() {
+            // Indices no longer map to the same files; drop the stale selection.
+            root.clearSelection()
             root.schedulePendingFocus()
         }
 
-        function onRowsInserted() {
+        function onRowsInserted(_p, first, last) {
+            root.reconcileAfterInsert(first, last)
             root.schedulePendingFocus()
+        }
+
+        function onRowsRemoved(_p, first, last) {
+            root.reconcileAfterRemove(first, last)
         }
     }
 
