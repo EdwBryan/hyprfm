@@ -71,6 +71,7 @@ public:
     Q_INVOKABLE QVariantList allInstalledApps() const;
     Q_INVOKABLE bool setFilePermissions(const QString &path, int ownerAccess, int groupAccess, int otherAccess);
     Q_INVOKABLE QString homePath() const;
+    Q_INVOKABLE QString standardPath(const QString &key) const;
     Q_INVOKABLE QVariantList pathSuggestions(const QString &input, int limit = 8) const;
 
     // Tests need a predictable "rowCount is correct right after setRootPath()"

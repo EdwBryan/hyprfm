@@ -43,6 +43,6 @@ private:
 
     QList<Bookmark> m_bookmarks;
     static QString expandPath(const QString &path);
-    static QString iconForPath(const QString &name);
+    static QString iconForPath(const QString &path, const QString &name);
     Bookmark makeBookmark(const QString &path) const;
 };

@@ -83,6 +83,25 @@ QStringList iconSearchDirs()
     return searchDirs;
 }
 
+// Default bookmarks follow the XDG user dirs, so they keep working on systems
+// where the folders are localised (Documentos, Imagens, ...). Entries that
+// don't resolve to a real directory are dropped instead of shipping a
+// bookmark that opens an empty view.
+QStringList defaultBookmarkPaths()
+{
+    QStringList paths = {
+        QStandardPaths::writableLocation(QStandardPaths::DocumentsLocation),
+        QStandardPaths::writableLocation(QStandardPaths::DownloadLocation),
+        QStandardPaths::writableLocation(QStandardPaths::PicturesLocation),
+        QDir::homePath() + QStringLiteral("/Projects"),
+    };
+
+    paths.removeAll(QString());
+    paths.removeDuplicates();
+    paths.removeIf([](const QString &path) { return !QFileInfo(path).isDir(); });
+    return paths;
+}
+
 } // namespace
 
 QMap<QString, QString> ConfigManager::s_defaultShortcuts = {
@@ -209,7 +228,7 @@ void ConfigManager::setDefaults()
     m_sidebarPosition = "left";
     m_sidebarWidth = 200;
     m_sidebarVisible = true;
-    m_bookmarks = {"~/Documents", "~/Downloads", "~/Pictures", "~/Projects"};
+    m_bookmarks = defaultBookmarkPaths();
     m_radiusSmall = 4;
     m_radiusMedium = 8;
     m_radiusLarge = 12;

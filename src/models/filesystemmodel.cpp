@@ -1877,6 +1877,28 @@ QString FileSystemModel::homePath() const
     return QDir::homePath();
 }
 
+// Resolves a well-known folder through the XDG user dirs so the sidebar points
+// at the real directory on localised systems. Falls back to home when the key
+// is unknown or the platform has nothing configured.
+QString FileSystemModel::standardPath(const QString &key) const
+{
+    static const QHash<QString, QStandardPaths::StandardLocation> locations = {
+        {QStringLiteral("desktop"), QStandardPaths::DesktopLocation},
+        {QStringLiteral("documents"), QStandardPaths::DocumentsLocation},
+        {QStringLiteral("downloads"), QStandardPaths::DownloadLocation},
+        {QStringLiteral("music"), QStandardPaths::MusicLocation},
+        {QStringLiteral("pictures"), QStandardPaths::PicturesLocation},
+        {QStringLiteral("videos"), QStandardPaths::MoviesLocation},
+    };
+
+    const auto it = locations.constFind(key.toLower());
+    if (it == locations.constEnd())
+        return QDir::homePath();
+
+    const QString path = QStandardPaths::writableLocation(*it);
+    return path.isEmpty() ? QDir::homePath() : path;
+}
+
 QVariantList FileSystemModel::pathSuggestions(const QString &input, int limit) const
 {
     QVariantList suggestions;
