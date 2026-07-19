@@ -881,6 +881,53 @@ private slots:
         if (finishSpy.isEmpty())
             QVERIFY(finishSpy.wait(10000));
     }
+
+    // --- Breadcrumbs ---
+
+    void testBreadcrumbSegmentsStartAtHome()
+    {
+        FileOperations ops;
+        const QString home = QDir::homePath();
+
+        const QVariantList atHome = ops.breadcrumbSegments(home);
+        QCOMPARE(atHome.size(), 1);
+        QCOMPARE(atHome.at(0).toMap().value("label").toString(), QString("Home"));
+        QCOMPARE(atHome.at(0).toMap().value("fullPath").toString(), home);
+
+        const QVariantList nested = ops.breadcrumbSegments(home + "/Downloads/reports");
+        QCOMPARE(nested.size(), 3);
+        QCOMPARE(nested.at(0).toMap().value("label").toString(), QString("Home"));
+        QCOMPARE(nested.at(0).toMap().value("fullPath").toString(), home);
+        QCOMPARE(nested.at(1).toMap().value("label").toString(), QString("Downloads"));
+        QCOMPARE(nested.at(1).toMap().value("fullPath").toString(), home + "/Downloads");
+        QCOMPARE(nested.at(2).toMap().value("label").toString(), QString("reports"));
+        QCOMPARE(nested.at(2).toMap().value("fullPath").toString(), home + "/Downloads/reports");
+    }
+
+    void testBreadcrumbSegmentsOutsideHomeKeepAncestors()
+    {
+        FileOperations ops;
+
+        const QVariantList segments = ops.breadcrumbSegments("/usr/share");
+        QCOMPARE(segments.size(), 2);
+        QCOMPARE(segments.at(0).toMap().value("label").toString(), QString("usr"));
+        QCOMPARE(segments.at(0).toMap().value("fullPath").toString(), QString("/usr"));
+        QCOMPARE(segments.at(1).toMap().value("label").toString(), QString("share"));
+        QCOMPARE(segments.at(1).toMap().value("fullPath").toString(), QString("/usr/share"));
+    }
+
+    void testBreadcrumbSegmentsDoNotMatchHomePrefix()
+    {
+        FileOperations ops;
+        const QString home = QDir::homePath();
+
+        // A sibling directory that merely starts with the same characters is
+        // not inside home, so it must not collapse to a "Home" crumb.
+        const QVariantList segments = ops.breadcrumbSegments(home + "-backup");
+        QVERIFY(!segments.isEmpty());
+        QVERIFY(segments.at(0).toMap().value("label").toString() != QStringLiteral("Home"));
+        QCOMPARE(segments.last().toMap().value("fullPath").toString(), home + "-backup");
+    }
 };
 
 QTEST_MAIN(TestFileOperations)

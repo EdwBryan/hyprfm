@@ -155,13 +155,7 @@ Item {
                     if (root.isRecentsView) return [{ label: "Recents", fullPath: "" }]
                     if (!root.path || root.path === "/") return []
 
-                    var result = fileOps.breadcrumbSegments(root.path)
-                    const homePath = fsModel.homePath()
-                    for (var i = 0; i < result.length; ++i) {
-                        if (result[i].fullPath === homePath)
-                            result[i].label = "Home"
-                    }
-                    return result
+                    return fileOps.breadcrumbSegments(root.path)
                 }
 
                 delegate: Row {
