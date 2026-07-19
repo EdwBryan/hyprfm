@@ -78,10 +78,20 @@ private slots:
 
     void testDefaultBookmarks()
     {
+        // Defaults drop entries that aren't real directories, so create one of
+        // the standard folders first. Without it the list could come back empty
+        // and the assertions below would pass without checking anything.
+        const QString pictures =
+            QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
+        QVERIFY(!pictures.isEmpty());
+        QVERIFY(QDir().mkpath(pictures));
+
         QTemporaryDir dir;
         ConfigManager mgr(dir.path() + "/config.toml");
 
         const QStringList bookmarks = mgr.bookmarks();
+        QVERIFY(!bookmarks.isEmpty());
+        QVERIFY(bookmarks.contains(pictures));
 
         // Defaults resolve through the XDG user dirs rather than hardcoded
         // English names, so every entry is an absolute path that exists.
@@ -89,11 +99,6 @@ private slots:
             QVERIFY(!path.startsWith(QLatin1Char('~')));
             QVERIFY(QFileInfo(path).isDir());
         }
-
-        const QString pictures =
-            QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
-        if (QFileInfo(pictures).isDir())
-            QVERIFY(bookmarks.contains(pictures));
     }
 
     void testDefaultShortcuts()
