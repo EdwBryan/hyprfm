@@ -513,7 +513,20 @@ QVariantList buildBreadcrumbs(const QString &path)
         return segments;
 
     QString accumulated;
-    const QStringList parts = normalized.split('/', Qt::SkipEmptyParts);
+    QStringList parts = normalized.split('/', Qt::SkipEmptyParts);
+
+    // Anything inside the user's home starts at a single "Home" crumb. Walking
+    // the real ancestors instead would render "/home" and "/home/<user>" side
+    // by side, which reads as "home / Home".
+    const QString home = QDir::homePath();
+    if (!home.isEmpty() && home != QStringLiteral("/")
+        && (normalized == home || normalized.startsWith(home + QLatin1Char('/')))) {
+        segments.append(QVariantMap{{QStringLiteral("label"), QStringLiteral("Home")},
+                                    {QStringLiteral("fullPath"), home}});
+        accumulated = home;
+        parts = normalized.mid(home.size()).split('/', Qt::SkipEmptyParts);
+    }
+
     for (const QString &part : parts) {
         accumulated += QStringLiteral("/") + part;
         segments.append(QVariantMap{{QStringLiteral("label"), part},
