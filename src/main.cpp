@@ -222,6 +222,10 @@ int main(int argc, char *argv[])
     mark("ThemeLoader loaded");
 
     TabListModel *tabModel = new TabListModel(&app);
+    tabModel->setDefaultViewMode(config->defaultView());
+    QObject::connect(config, &ConfigManager::configChanged, tabModel, [=]() {
+        tabModel->setDefaultViewMode(config->defaultView());
+    });
 
     // Restore session (tabs + window geometry)
     const QString sessionPath = configDir + "/session.json";

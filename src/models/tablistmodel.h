@@ -38,6 +38,8 @@ public:
     QJsonArray saveSession() const;
     void restoreSession(const QJsonArray &tabs, int activeIdx);
 
+    void setDefaultViewMode(const QString &mode);
+
 signals:
     void activeIndexChanged();
     void countChanged();
@@ -48,6 +50,7 @@ private:
     void connectTab(int row, TabModel *tab);
     QList<TabModel *> m_tabs;
     int m_activeIndex = 0;
+    QString m_defaultViewMode = QStringLiteral("grid");
 
     struct ClosedTabInfo {
         QString path;

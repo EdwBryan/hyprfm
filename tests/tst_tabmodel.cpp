@@ -4,6 +4,7 @@
 #include <QSignalSpy>
 #include <QAbstractItemModelTester>
 #include <QFileInfo>
+#include <QDir>
 #include "models/tabmodel.h"
 #include "models/tablistmodel.h"
 
@@ -259,6 +260,27 @@ private slots:
 
         model.closeTab(0);
         QCOMPARE(model.rowCount(), 1); // Still one tab
+    }
+
+    void testTabListModelDefaultViewMode()
+    {
+        TabListModel model;
+        model.setDefaultViewMode("detailed");
+        QCOMPARE(model.activeTab()->viewMode(), QString("detailed"));
+
+        model.addTab();
+        QCOMPARE(model.activeTab()->viewMode(), QString("detailed"));
+    }
+
+    void testTabListModelRestoreSessionFallsBackToDefaultViewMode()
+    {
+        TabListModel model;
+        model.setDefaultViewMode("detailed");
+
+        QJsonArray tabs;
+        tabs.append(QJsonObject{{"path", QDir::homePath()}}); // no viewMode key
+        model.restoreSession(tabs, 0);
+        QCOMPARE(model.activeTab()->viewMode(), QString("detailed"));
     }
 
     void testTabListModelActiveIndex()

@@ -115,10 +115,23 @@ TabModel *TabListModel::tabAt(int index) const
     return nullptr;
 }
 
+void TabListModel::setDefaultViewMode(const QString &mode)
+{
+    if (mode.isEmpty() || m_defaultViewMode == mode)
+        return;
+    m_defaultViewMode = mode;
+    // Apply to tabs still on the built-in default (startup tab before session restore)
+    for (TabModel *tab : m_tabs) {
+        if (tab->viewMode() == QStringLiteral("grid"))
+            tab->setViewMode(mode);
+    }
+}
+
 void TabListModel::addTab()
 {
     beginInsertRows(QModelIndex(), m_tabs.size(), m_tabs.size());
     auto *tab = new TabModel(this);
+    tab->setViewMode(m_defaultViewMode);
     m_tabs.append(tab);
     connectTab(m_tabs.size() - 1, tab);
     endInsertRows();
@@ -215,7 +228,7 @@ void TabListModel::restoreSession(const QJsonArray &tabs, int activeIdx)
         QJsonObject obj = val.toObject();
         auto *tab = new TabModel(this);
         tab->navigateTo(normalizedSessionPath(obj.value("path").toString()));
-        tab->setViewMode(obj.value("viewMode").toString("grid"));
+        tab->setViewMode(obj.value("viewMode").toString(m_defaultViewMode));
         tab->setSplitViewEnabled(obj.value("splitViewEnabled").toBool(false));
         tab->setSecondaryCurrentPath(normalizedSessionPath(obj.value("secondaryPath").toString(tab->currentPath())));
         tab->setSortBy(obj.value("sortBy").toString("name"));
