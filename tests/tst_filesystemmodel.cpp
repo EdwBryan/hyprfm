@@ -1049,6 +1049,21 @@ private slots:
         QCOMPARE(suggestions.size(), 2);
     }
 
+    void testStandardPathFollowsXdgUserDirs()
+    {
+        FileSystemModel model;
+
+        QCOMPARE(model.standardPath("pictures"),
+                 QStandardPaths::writableLocation(QStandardPaths::PicturesLocation));
+        QCOMPARE(model.standardPath("downloads"),
+                 QStandardPaths::writableLocation(QStandardPaths::DownloadLocation));
+
+        // Keys are case insensitive, and anything unknown falls back to home
+        QCOMPARE(model.standardPath("PICTURES"),
+                 QStandardPaths::writableLocation(QStandardPaths::PicturesLocation));
+        QCOMPARE(model.standardPath("not-a-folder"), QDir::homePath());
+    }
+
 private:
     // Helper to set permissions without a FileSystemModel instance
     void model_setPermissionsHelper(const QString &path, int ownerAccess, int groupAccess, int otherAccess)

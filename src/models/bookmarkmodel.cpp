@@ -1,6 +1,7 @@
 #include "models/bookmarkmodel.h"
 #include <QDir>
 #include <QFileInfo>
+#include <QStandardPaths>
 #include <QUrl>
 
 namespace {
@@ -174,7 +175,7 @@ BookmarkModel::Bookmark BookmarkModel::makeBookmark(const QString &rawPath) cons
 {
     QString expanded = expandPath(rawPath);
     QString name = bookmarkDisplayName(expanded);
-    return {name, expanded, iconForPath(name.toLower())};
+    return {name, expanded, iconForPath(expanded, name.toLower())};
 }
 
 QString BookmarkModel::expandPath(const QString &path)
@@ -187,8 +188,29 @@ QString BookmarkModel::expandPath(const QString &path)
     return path;
 }
 
-QString BookmarkModel::iconForPath(const QString &name)
+QString BookmarkModel::iconForPath(const QString &path, const QString &name)
 {
+    // Match the XDG user dirs first: on a localised system the folder is named
+    // "Imagens" or "Documentos", which the English name table below misses.
+    static const QVector<QPair<QStandardPaths::StandardLocation, QString>> xdgIcons = {
+        {QStandardPaths::HomeLocation, QStringLiteral("go-home")},
+        {QStandardPaths::DocumentsLocation, QStringLiteral("folder-documents")},
+        {QStandardPaths::DownloadLocation, QStringLiteral("folder-download")},
+        {QStandardPaths::PicturesLocation, QStringLiteral("folder-pictures")},
+        {QStandardPaths::MusicLocation, QStringLiteral("folder-music")},
+        {QStandardPaths::MoviesLocation, QStringLiteral("folder-videos")},
+        {QStandardPaths::DesktopLocation, QStringLiteral("user-desktop")},
+    };
+
+    if (!path.isEmpty()) {
+        const QString cleaned = QDir::cleanPath(path);
+        for (const auto &entry : xdgIcons) {
+            const QString resolved = QStandardPaths::writableLocation(entry.first);
+            if (!resolved.isEmpty() && QDir::cleanPath(resolved) == cleaned)
+                return entry.second;
+        }
+    }
+
     static const QMap<QString, QString> icons = {
         {"home", "go-home"},
         {"documents", "folder-documents"},

@@ -1,6 +1,7 @@
 #include <QTest>
 #include <QTemporaryDir>
 #include <QFile>
+#include <QFileInfo>
 #include <QSignalSpy>
 #include <QStandardPaths>
 #include "services/configmanager.h"
@@ -77,11 +78,27 @@ private slots:
 
     void testDefaultBookmarks()
     {
+        // Defaults drop entries that aren't real directories, so create one of
+        // the standard folders first. Without it the list could come back empty
+        // and the assertions below would pass without checking anything.
+        const QString pictures =
+            QStandardPaths::writableLocation(QStandardPaths::PicturesLocation);
+        QVERIFY(!pictures.isEmpty());
+        QVERIFY(QDir().mkpath(pictures));
+
         QTemporaryDir dir;
         ConfigManager mgr(dir.path() + "/config.toml");
 
-        QStringList bookmarks = mgr.bookmarks();
-        QVERIFY(bookmarks.size() >= 1);
+        const QStringList bookmarks = mgr.bookmarks();
+        QVERIFY(!bookmarks.isEmpty());
+        QVERIFY(bookmarks.contains(pictures));
+
+        // Defaults resolve through the XDG user dirs rather than hardcoded
+        // English names, so every entry is an absolute path that exists.
+        for (const QString &path : bookmarks) {
+            QVERIFY(!path.startsWith(QLatin1Char('~')));
+            QVERIFY(QFileInfo(path).isDir());
+        }
     }
 
     void testDefaultShortcuts()

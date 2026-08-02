@@ -120,8 +120,8 @@ Rectangle {
                         if (model.name === "Recents") return ""
                         if (model.name === "Trash") return root.trashPath
                         if (model.name === "Network") return "network:///"
-                        if (model.name === "Pictures") return home + "/Pictures"
-                        if (model.name === "Downloads") return home + "/Downloads"
+                        if (model.name === "Pictures") return fsModel.standardPath("pictures")
+                        if (model.name === "Downloads") return fsModel.standardPath("downloads")
                         return ""
                     }
 
