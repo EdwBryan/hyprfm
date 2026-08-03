@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - main
+  schedule:
+    - cron: "17 */6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: aur-update
+  cancel-in-progress: false
 
 jobs:
   aur:
@@ -26,9 +33,11 @@ jobs:
           mkdir -p ~/.ssh
           echo "$AUR_SSH_KEY" > ~/.ssh/aur
           chmod 600 ~/.ssh/aur
-          echo "Host aur.archlinux.org" >> ~/.ssh/config
-          echo "  IdentityFile ~/.ssh/aur" >> ~/.ssh/config
-          echo "  User aur" >> ~/.ssh/config
+          {
+            echo "Host aur.archlinux.org"
+            echo "  IdentityFile ~/.ssh/aur"
+            echo "  User aur"
+          } >> ~/.ssh/config
           ssh-keyscan aur.archlinux.org >> ~/.ssh/known_hosts 2>/dev/null
         env:
           AUR_SSH_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
@@ -36,12 +45,13 @@ jobs:
       - name: Clone AUR repo
         run: git clone ssh://aur@aur.archlinux.org/hyprfm-git.git aur-repo
 
-      - name: Sync PKGBUILD from repo and update pkgver
+      - name: Sync package metadata
         run: |
           cp PKGBUILD aur-repo/PKGBUILD
-          cd aur-repo
-          sed -i "s/^pkgver=.*/pkgver=$PKGVER/" PKGBUILD
-          sed -i "s/pkgver = .*/pkgver = $PKGVER/" .SRCINFO
+          sed -i "s/^pkgver=.*/pkgver=$PKGVER/" aur-repo/PKGBUILD
+          docker run --rm --volume "$PWD/aur-repo:/pkg" archlinux:base-devel \
+            bash -c 'useradd --uid "$(stat --format=%u /pkg)" --create-home builder && cd /pkg && runuser -u builder -- makepkg --printsrcinfo' \
+            > aur-repo/.SRCINFO
         env:
           PKGVER: ${{ steps.pkgver.outputs.pkgver }}
 
