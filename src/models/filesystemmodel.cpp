@@ -1904,7 +1904,7 @@ QVariantList FileSystemModel::pathSuggestions(const QString &input, int limit) c
     QVariantList suggestions;
 
     const QString trimmed = input.trimmed();
-    if (trimmed.isEmpty() || limit <= 0)
+    if (trimmed.isEmpty() || limit == 0)
         return suggestions;
 
     const bool preferTildeDisplay = trimmed == QStringLiteral("~")
@@ -1938,11 +1938,58 @@ QVariantList FileSystemModel::pathSuggestions(const QString &input, int limit) c
     if (m_showHidden || fragment.startsWith(QLatin1Char('.')))
         filters |= QDir::Hidden;
 
+    const QString foldedFragment = fragment.toCaseFolded();
+    auto matchScore = [&foldedFragment](const QString &name) -> int {
+        if (foldedFragment.isEmpty())
+            return 0;
+
+        const QString foldedName = name.toCaseFolded();
+        const int nameSize = static_cast<int>(foldedName.size());
+        if (foldedName == foldedFragment)
+            return 400000;
+        if (foldedName.startsWith(foldedFragment))
+            return 300000 - nameSize;
+
+        const int substringIndex = foldedName.indexOf(foldedFragment);
+        if (substringIndex >= 0)
+            return 200000 - substringIndex * 100 - nameSize;
+
+        int queryIndex = 0;
+        int firstMatch = -1;
+        int lastMatch = -1;
+        for (int i = 0; i < foldedName.size() && queryIndex < foldedFragment.size(); ++i) {
+            if (foldedName.at(i) != foldedFragment.at(queryIndex))
+                continue;
+            if (firstMatch < 0)
+                firstMatch = i;
+            lastMatch = i;
+            ++queryIndex;
+        }
+
+        if (queryIndex != foldedFragment.size())
+            return -1;
+        return 100000 - (lastMatch - firstMatch) * 100 - nameSize;
+    };
+
+    QList<QPair<int, QFileInfo>> rankedEntries;
     const QFileInfoList entries = dir.entryInfoList(filters, QDir::Name | QDir::IgnoreCase);
+    rankedEntries.reserve(entries.size());
     for (const QFileInfo &entry : entries) {
+        const int score = matchScore(entry.fileName());
+        if (score >= 0)
+            rankedEntries.append({score, entry});
+    }
+
+    std::sort(rankedEntries.begin(), rankedEntries.end(), [](const auto &left, const auto &right) {
+        if (left.first != right.first)
+            return left.first > right.first;
+        return QString::compare(left.second.fileName(), right.second.fileName(),
+                                Qt::CaseInsensitive) < 0;
+    });
+
+    for (const auto &rankedEntry : rankedEntries) {
+        const QFileInfo &entry = rankedEntry.second;
         const QString name = entry.fileName();
-        if (!fragment.isEmpty() && !name.startsWith(fragment, Qt::CaseInsensitive))
-            continue;
 
         QVariantMap suggestion;
         const QString absolutePath = QDir::cleanPath(entry.absoluteFilePath());
@@ -1951,7 +1998,7 @@ QVariantList FileSystemModel::pathSuggestions(const QString &input, int limit) c
         suggestion.insert(QStringLiteral("name"), name);
         suggestions.append(suggestion);
 
-        if (suggestions.size() >= limit)
+        if (limit > 0 && suggestions.size() >= limit)
             break;
     }
 

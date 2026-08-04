@@ -1082,6 +1082,37 @@ private slots:
         QCOMPARE(suggestions.size(), 2);
     }
 
+    void testPathSuggestionsReturnAllChildrenWithoutLimit()
+    {
+        TestDir dir;
+        for (int i = 0; i < 12; ++i)
+            dir.createDir(QStringLiteral("Folder%1").arg(i, 2, 10, QLatin1Char('0')));
+
+        FileSystemModel model;
+        const QVariantList suggestions = model.pathSuggestions(dir.path() + "/", -1);
+
+        QCOMPARE(suggestions.size(), 12);
+    }
+
+    void testPathSuggestionsRankBestMatchesFirst()
+    {
+        TestDir dir;
+        const QString exact = dir.createDir("Alp");
+        const QString prefix = dir.createDir("Alpine");
+        const QString contained = dir.createDir("MyAlpFolder");
+        const QString fuzzy = dir.createDir("A-long-path");
+        dir.createDir("Beta");
+
+        FileSystemModel model;
+        const QVariantList suggestions = model.pathSuggestions(dir.path() + "/alp", 8);
+
+        QCOMPARE(suggestions.size(), 4);
+        QCOMPARE(suggestions.at(0).toMap().value("path").toString(), exact);
+        QCOMPARE(suggestions.at(1).toMap().value("path").toString(), prefix);
+        QCOMPARE(suggestions.at(2).toMap().value("path").toString(), contained);
+        QCOMPARE(suggestions.at(3).toMap().value("path").toString(), fuzzy);
+    }
+
     void testStandardPathFollowsXdgUserDirs()
     {
         FileSystemModel model;

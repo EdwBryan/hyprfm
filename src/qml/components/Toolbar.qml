@@ -109,6 +109,7 @@ Rectangle {
 
         // ── Row 1: Navigation + Breadcrumb + Search ──
         Item {
+            z: 1
             Layout.fillWidth: true
             Layout.preferredHeight: Theme.toolbarRowHeight
 

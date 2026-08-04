@@ -41,7 +41,7 @@ Item {
             return
         }
 
-        suggestionItems = fsModel.pathSuggestions(query, 8)
+        suggestionItems = fsModel.pathSuggestions(query, query.endsWith("/") ? -1 : 8)
         suggestionIndex = suggestionItems.length > 0 ? 0 : -1
     }
 
