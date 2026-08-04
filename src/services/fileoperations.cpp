@@ -633,13 +633,6 @@ QString trashUriForPath(const QString &path)
     return trashUrl.toString(QUrl::FullyEncoded);
 }
 
-QString shellQuote(const QString &value)
-{
-    QString escaped = value;
-    escaped.replace("'", "'\"'\"'");
-    return QStringLiteral("'") + escaped + QStringLiteral("'");
-}
-
 enum class ArchiveKind {
     None,
     Zip,
@@ -1692,61 +1685,61 @@ void FileOperations::compressFiles(const QStringList &paths, const QString &form
     QString parentDir = first.absolutePath();
     QString outputPath;
 
-    QString cmd;
+    QString program;
+    QStringList args;
     if (format == "zip") {
         QString outPath = parentDir + "/" + baseName + ".zip";
         outputPath = outPath;
-        cmd = "zip -r " + QString("'%1'").arg(outPath);
-        for (const auto &p : paths) {
-            QFileInfo fi(p);
-            cmd += " -j " + QString("'%1'").arg(p);
-        }
-        // Use cd + relative paths for proper zip structure
-        cmd = "cd " + QString("'%1'").arg(parentDir) + " && zip -rv " +
-              QString("'%1'").arg(outPath);
+        program = QStringLiteral("zip");
+        args = {QStringLiteral("-rv"), outPath, QStringLiteral("--")};
         for (const auto &p : paths)
-            cmd += " " + QString("'%1'").arg(QFileInfo(p).fileName());
+            args.append(QFileInfo(p).fileName());
     } else if (format == "tar.gz") {
         QString outPath = parentDir + "/" + baseName + ".tar.gz";
         outputPath = outPath;
-        cmd = "tar -cvzf " + QString("'%1'").arg(outPath) +
-              " -C " + QString("'%1'").arg(parentDir);
+        program = QStringLiteral("tar");
+        args = {QStringLiteral("-cvzf"), outPath, QStringLiteral("-C"), parentDir,
+                QStringLiteral("--")};
         for (const auto &p : paths)
-            cmd += " " + QString("'%1'").arg(QFileInfo(p).fileName());
+            args.append(QFileInfo(p).fileName());
     } else if (format == "tar.xz") {
         QString outPath = parentDir + "/" + baseName + ".tar.xz";
         outputPath = outPath;
-        cmd = "tar -cvJf " + QString("'%1'").arg(outPath) +
-              " -C " + QString("'%1'").arg(parentDir);
+        program = QStringLiteral("tar");
+        args = {QStringLiteral("-cvJf"), outPath, QStringLiteral("-C"), parentDir,
+                QStringLiteral("--")};
         for (const auto &p : paths)
-            cmd += " " + QString("'%1'").arg(QFileInfo(p).fileName());
+            args.append(QFileInfo(p).fileName());
     } else if (format == "tar.bz2") {
         QString outPath = parentDir + "/" + baseName + ".tar.bz2";
         outputPath = outPath;
-        cmd = "tar -cvjf " + QString("'%1'").arg(outPath) +
-              " -C " + QString("'%1'").arg(parentDir);
+        program = QStringLiteral("tar");
+        args = {QStringLiteral("-cvjf"), outPath, QStringLiteral("-C"), parentDir,
+                QStringLiteral("--")};
         for (const auto &p : paths)
-            cmd += " " + QString("'%1'").arg(QFileInfo(p).fileName());
+            args.append(QFileInfo(p).fileName());
     } else if (format == "tar") {
         QString outPath = parentDir + "/" + baseName + ".tar";
         outputPath = outPath;
-        cmd = "tar -cvf " + QString("'%1'").arg(outPath) +
-              " -C " + QString("'%1'").arg(parentDir);
+        program = QStringLiteral("tar");
+        args = {QStringLiteral("-cvf"), outPath, QStringLiteral("-C"), parentDir,
+                QStringLiteral("--")};
         for (const auto &p : paths)
-            cmd += " " + QString("'%1'").arg(QFileInfo(p).fileName());
+            args.append(QFileInfo(p).fileName());
     } else if (format == "7z") {
         QString outPath = parentDir + "/" + baseName + ".7z";
         outputPath = outPath;
-        cmd = "cd " + shellQuote(parentDir) + " && 7z a " + shellQuote(outPath);
+        program = QStringLiteral("7z");
+        args = {QStringLiteral("a"), outPath, QStringLiteral("--")};
         for (const auto &p : paths)
-            cmd += " " + shellQuote(QFileInfo(p).fileName());
+            args.append(QFileInfo(p).fileName());
     } else {
         return;
     }
 
     const QString statusText = QString("Compressing %1 item(s)...").arg(paths.size());
     startSimpleOperation(statusText, {outputPath},
-        [paths, cmd](ProgressReporter report) -> QString {
+        [paths, parentDir, program, args](ProgressReporter report) -> QString {
             // Pre-count files for progress
             int totalFiles = 0;
             for (const auto &p : paths) {
@@ -1765,8 +1758,9 @@ void FileOperations::compressFiles(const QStringList &paths, const QString &form
 
             // Run with verbose output and count lines for progress
             QProcess proc;
+            proc.setWorkingDirectory(parentDir);
             proc.setProcessChannelMode(QProcess::MergedChannels);
-            proc.start(QStringLiteral("sh"), {QStringLiteral("-c"), cmd});
+            proc.start(program, args);
             if (!proc.waitForStarted(5000))
                 return QStringLiteral("Failed to start compression");
 

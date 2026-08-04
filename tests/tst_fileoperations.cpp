@@ -828,6 +828,39 @@ private slots:
         QVERIFY(QFile::exists(extractDir.path() + "/payload/inner.txt"));
     }
 
+    void testCompressionDoesNotExecuteFileNames_data()
+    {
+        QTest::addColumn<QString>("format");
+        QTest::addColumn<QString>("extension");
+        QTest::addColumn<QString>("executable");
+
+        QTest::newRow("zip") << "zip" << ".zip" << "zip";
+        QTest::newRow("tar") << "tar" << ".tar" << "tar";
+    }
+
+    void testCompressionDoesNotExecuteFileNames()
+    {
+        QFETCH(QString, format);
+        QFETCH(QString, extension);
+        QFETCH(QString, executable);
+        if (QStandardPaths::findExecutable(executable).isEmpty())
+            QSKIP(qPrintable(executable + " not found in PATH"));
+
+        TestDir dir;
+        const QString fileName = "payload'; touch PWNED; #.txt";
+        const QString sourcePath = dir.createFile(fileName, "safe");
+        const QString markerPath = dir.path() + "/PWNED";
+
+        FileOperations ops;
+        QSignalSpy finishSpy(&ops, &FileOperations::operationFinished);
+        ops.compressFiles({sourcePath}, format);
+
+        QVERIFY(finishSpy.wait(5000));
+        QCOMPARE(finishSpy.constFirst().at(0).toBool(), true);
+        QVERIFY(!QFileInfo::exists(markerPath));
+        QVERIFY(QFileInfo::exists(dir.path() + "/payload'; touch PWNED; #" + extension));
+    }
+
     // --- Progress property ---
 
     void testProgressInitialValue()

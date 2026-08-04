@@ -8,6 +8,7 @@
 #include <QProcess>
 #include <QUuid>
 #include "models/filesystemmodel.h"
+#include "services/gitstatusservice.h"
 #include "testdir.h"
 
 class TestFileSystemModel : public QObject
@@ -30,6 +31,38 @@ private slots:
         QCOMPARE(model.fileCount(), 0);
         QCOMPARE(model.folderCount(), 0);
         QCOMPARE(model.showHidden(), false);
+    }
+
+    void testGitStatusDisablesRepositoryFsmonitor()
+    {
+        if (QStandardPaths::findExecutable("git").isEmpty())
+            QSKIP("git not found in PATH");
+
+        TestDir repo;
+        const QString markerPath = repo.path() + "/PWNED";
+        const QString monitorPath = repo.path() + "/fsmonitor";
+        QFile monitor(monitorPath);
+        QVERIFY(monitor.open(QIODevice::WriteOnly));
+        monitor.write("#!/bin/sh\n: > PWNED\n");
+        monitor.close();
+        QVERIFY(monitor.setPermissions(QFileDevice::ReadOwner | QFileDevice::WriteOwner
+                                       | QFileDevice::ExeOwner));
+
+        QProcess git;
+        git.setWorkingDirectory(repo.path());
+        git.start("git", {"init", "-q"});
+        QVERIFY(git.waitForFinished(5000));
+        QCOMPARE(git.exitCode(), 0);
+        git.start("git", {"config", "core.fsmonitor", monitorPath});
+        QVERIFY(git.waitForFinished(5000));
+        QCOMPARE(git.exitCode(), 0);
+
+        GitStatusService service;
+        QSignalSpy statusSpy(&service, &GitStatusService::statusChanged);
+        service.setRootPath(repo.path());
+
+        QVERIFY(statusSpy.wait(5000));
+        QVERIFY(!QFileInfo::exists(markerPath));
     }
 
     // 2. homePath()

@@ -29,14 +29,20 @@ bool gitStatusHostToolAvailable(const QString &program)
 
 void startGitTool(QProcess *process, const QStringList &arguments)
 {
+    QStringList safeArguments {
+        QStringLiteral("-c"), QStringLiteral("core.fsmonitor=false"),
+        QStringLiteral("-c"), QStringLiteral("core.hooksPath=/dev/null")
+    };
+    safeArguments.append(arguments);
+
     if (gitStatusRunningInFlatpak()) {
         QStringList hostArgs;
-        hostArgs << QStringLiteral("--host") << QStringLiteral("git") << arguments;
+        hostArgs << QStringLiteral("--host") << QStringLiteral("git") << safeArguments;
         process->start(QStringLiteral("flatpak-spawn"), hostArgs);
         return;
     }
 
-    process->start(QStringLiteral("git"), arguments);
+    process->start(QStringLiteral("git"), safeArguments);
 }
 
 } // namespace
