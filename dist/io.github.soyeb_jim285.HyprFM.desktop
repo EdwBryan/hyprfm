@@ -11,3 +11,8 @@ MimeType=inode/directory;
 StartupNotify=true
 StartupWMClass=hyprfm
 Keywords=files;explorer;manager;browser;filesystem;
+Actions=new-window;
+
+[Desktop Action new-window]
+Name=New Window
+Exec=hyprfm --new-window

@@ -1675,6 +1675,19 @@ void FileOperations::openInTerminal(const QString &dirPath)
             proc, &QProcess::deleteLater);
 }
 
+// Launch a second, independent HyprFM window. `--new-window` makes the child
+// skip the single-instance handoff (and the shared session file), so the two
+// windows coexist instead of the new process forwarding to this one.
+void FileOperations::openNewWindow(const QString &dirPath)
+{
+    QStringList args{QStringLiteral("--new-window")};
+    if (!dirPath.isEmpty())
+        args.append(dirPath);
+
+    if (!QProcess::startDetached(QCoreApplication::applicationFilePath(), args))
+        emit operationFinished(false, QStringLiteral("Failed to open a new window"));
+}
+
 void FileOperations::compressFiles(const QStringList &paths, const QString &format)
 {
     if (paths.isEmpty()) return;

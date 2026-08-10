@@ -216,6 +216,15 @@ Q.Dialog {
             }
 
             Q.Button {
+                text: "Don't show again"
+                variant: "ghost"
+                onClicked: {
+                    config.saveSettings({ dependencyStartupCheck: false })
+                    root.close()
+                }
+            }
+
+            Q.Button {
                 text: "Re-check"
                 onClicked: root.refreshLists()
             }

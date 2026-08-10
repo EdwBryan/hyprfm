@@ -166,3 +166,14 @@ set_tests_properties(tst_giotransferworker PROPERTIES
     RUN_SERIAL TRUE
     TIMEOUT 120
 )
+
+# Multi-window / single-instance arbitration lives in main(), so it is covered
+# by driving the real binary. Skips itself (exit 77) without a Wayland session.
+add_test(NAME tst_instance_launch
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/tst_instance_launch.sh $<TARGET_FILE:hyprfm>
+)
+set_tests_properties(tst_instance_launch PROPERTIES
+    SKIP_RETURN_CODE 77
+    RUN_SERIAL TRUE
+    TIMEOUT 120
+)

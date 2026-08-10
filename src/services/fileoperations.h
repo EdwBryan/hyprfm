@@ -70,6 +70,7 @@ public:
     Q_INVOKABLE QString pasteClipboardImage(const QString &destinationDir);
     Q_INVOKABLE void copyPathToClipboard(const QString &path);
     Q_INVOKABLE void openInTerminal(const QString &dirPath);
+    Q_INVOKABLE void openNewWindow(const QString &dirPath);
     Q_INVOKABLE void compressFiles(const QStringList &paths, const QString &format);
     Q_INVOKABLE void extractArchive(const QString &archivePath, const QString &destination);
     Q_INVOKABLE static bool isArchive(const QString &path);

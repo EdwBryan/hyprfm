@@ -114,6 +114,10 @@ Rectangle {
                 delegate: Rectangle {
                     id: quickAccessDelegate
 
+                    // Entries the user hid via the sidebar context menu or
+                    // Settings → Layout collapse away entirely.
+                    visible: config.hiddenQuickAccess.indexOf(model.name) < 0
+
                     readonly property string resolvedPath: {
                         const home = fsModel.homePath()
                         if (model.name === "Home") return home

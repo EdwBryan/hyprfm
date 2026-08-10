@@ -1239,6 +1239,7 @@ ApplicationWindow {
         currentSidebarWidth: root.sidebarWidth
         onRemoteConnectRequested: root.openRemoteConnectDialog()
         onKeyboardShortcutsRequested: root.openKeyboardShortcutsDialog()
+        onDependenciesRequested: missingDependenciesDialog.openDialog()
         onClosed: root.scheduleActivePaneFocus()
     }
 
@@ -1252,15 +1253,15 @@ ApplicationWindow {
         onClosed: root.scheduleActivePaneFocus()
     }
 
-    // Show the missing-dependencies dialog shortly after startup if anything
-    // is unavailable. Delayed so the window renders first and the dialog
-    // open-animation lines up against a visible backdrop.
+    // Nag on startup only when a *required* tool is missing — those actually
+    // break file operations. Optional backends (iPhone/AFC, ffmpeg, ...) stay
+    // silent; the full list is reachable from Settings → Tools.
     Timer {
         id: missingDepsStartupTimer
         interval: 400
         repeat: false
         onTriggered: {
-            if (dependencies && dependencies.hasAnyMissing)
+            if (config.dependencyStartupCheck && dependencies && dependencies.hasMissingRequired)
                 missingDependenciesDialog.openDialog()
         }
     }
@@ -2808,6 +2809,15 @@ ApplicationWindow {
             } else if (action === "removebookmark") {
                 if (sidebarItem.kind === "bookmark" && sidebarItem.index >= 0)
                     bookmarks.removeBookmark(sidebarItem.index)
+            } else if (action === "hidequickaccess") {
+                if (sidebarItem.kind === "quickAccess" && sidebarItem.name) {
+                    var hidden = config.hiddenQuickAccess.slice()
+                    if (hidden.indexOf(sidebarItem.name) < 0) {
+                        hidden.push(sidebarItem.name)
+                        config.saveSettings({ hiddenQuickAccess: hidden })
+                        toast.show(sidebarItem.name + " hidden — restore it in Settings → Layout", "info")
+                    }
+                }
             } else if (action === "mountdevice") {
                 if (sidebarItem.backend === "udisks2" && !runtimeFeatures.udisksctlAvailable) {
                     toast.show(runtimeFeatures.installHint("deviceMount"), "info")
@@ -2835,6 +2845,11 @@ ApplicationWindow {
     Shortcut {
         sequence: config.shortcutMap["new_tab"]
         onActivated: tabModel.addTab()
+    }
+
+    Shortcut {
+        sequence: config.shortcutMap["new_window"]
+        onActivated: fileOps.openNewWindow(root.panePath(root.activePane))
     }
 
     Shortcut {
@@ -3143,9 +3158,13 @@ ApplicationWindow {
             return []
 
         if (item.kind === "quickAccess") {
+            const hideEntry = { text: "Hide from Sidebar", shortcut: "", action: "hidequickaccess" }
+
             if (item.isRecents)
                 return [
-                    { text: "Open", shortcut: "", action: "open" }
+                    { text: "Open", shortcut: "", action: "open" },
+                    { separator: true },
+                    hideEntry
                 ]
 
             if (fileOps.isTrashPath(item.path))
@@ -3154,7 +3173,9 @@ ApplicationWindow {
                     { text: "Open in New Tab", shortcut: "", action: "opennewtab" },
                     { text: "Open in Split View", shortcut: "", action: "split_open", icon: "SquareSplitHorizontal" },
                     { separator: true },
-                    { text: "Empty Trash", shortcut: "", action: "emptytrash", destructive: true }
+                    { text: "Empty Trash", shortcut: "", action: "emptytrash", destructive: true },
+                    { separator: true },
+                    hideEntry
                 ]
 
             return [
@@ -3163,7 +3184,9 @@ ApplicationWindow {
                 { text: "Open in Split View", shortcut: "", action: "split_open", icon: "SquareSplitHorizontal" },
                 { separator: true },
                 { text: "Open in Terminal", shortcut: "", action: "terminal" },
-                { text: "Properties", shortcut: "", action: "properties" }
+                { text: "Properties", shortcut: "", action: "properties" },
+                { separator: true },
+                hideEntry
             ]
         }
 

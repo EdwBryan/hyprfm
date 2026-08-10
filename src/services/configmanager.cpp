@@ -29,6 +29,7 @@ const ShortcutSpec kShortcutSpecs[] = {
     {"home", "Home"},
     {"refresh", "Refresh"},
     {"new_tab", "New Tab"},
+    {"new_window", "New Window"},
     {"close_tab", "Close Tab"},
     {"reopen_tab", "Reopen Closed Tab"},
     {"open_in_new_tab", "Open in New Tab"},
@@ -112,6 +113,7 @@ QMap<QString, QString> ConfigManager::s_defaultShortcuts = {
     {"home", "Alt+Home"},
     {"refresh", "F5"},
     {"new_tab", "Ctrl+T"},
+    {"new_window", "Ctrl+Alt+N"},
     {"close_tab", "Ctrl+W"},
     {"reopen_tab", "Ctrl+Shift+T"},
     {"open_in_new_tab", "Ctrl+Return"},
@@ -227,7 +229,9 @@ void ConfigManager::setDefaults()
     m_rememberSortPerFolder = true;
     m_sidebarPosition = "left";
     m_sidebarWidth = 200;
+    m_dependencyStartupCheck = true;
     m_sidebarVisible = true;
+    m_hiddenQuickAccess.clear();
     m_bookmarks = defaultBookmarkPaths();
     m_radiusSmall = 4;
     m_radiusMedium = 8;
@@ -280,6 +284,8 @@ void ConfigManager::loadConfig()
             m_defaultView = QString::fromStdString(*v);
         if (auto v = config["general"]["show_hidden"].value<bool>())
             m_showHidden = *v;
+        if (auto v = config["general"]["dependency_startup_check"].value<bool>())
+            m_dependencyStartupCheck = *v;
         if (auto v = config["general"]["sort_by"].value<std::string>())
             m_sortBy = QString::fromStdString(*v);
         if (auto v = config["general"]["sort_ascending"].value<bool>())
@@ -293,6 +299,16 @@ void ConfigManager::loadConfig()
             m_sidebarWidth = static_cast<int>(*v);
         if (auto v = config["sidebar"]["visible"].value<bool>())
             m_sidebarVisible = *v;
+
+        // Quick-access entries the user removed from the sidebar, by name
+        // ("Pictures", "Network", ...). Absent key = show everything.
+        m_hiddenQuickAccess.clear();
+        if (auto arr = config["sidebar"]["hidden_quick_access"].as_array()) {
+            for (const auto &item : *arr) {
+                if (auto v = item.value<std::string>())
+                    m_hiddenQuickAccess.append(QString::fromStdString(*v));
+            }
+        }
 
         // Appearance
         if (auto v = config["appearance"]["radius_small"].value<int64_t>())
@@ -383,12 +399,14 @@ bool ConfigManager::builtinIcons() const { return m_builtinIcons; }
 QString ConfigManager::fontFamily() const { return m_fontFamily; }
 QString ConfigManager::defaultView() const { return m_defaultView; }
 bool ConfigManager::showHidden() const { return m_showHidden; }
+bool ConfigManager::dependencyStartupCheck() const { return m_dependencyStartupCheck; }
 QString ConfigManager::sortBy() const { return m_sortBy; }
 bool ConfigManager::sortAscending() const { return m_sortAscending; }
 bool ConfigManager::rememberSortPerFolder() const { return m_rememberSortPerFolder; }
 QString ConfigManager::sidebarPosition() const { return m_sidebarPosition; }
 int ConfigManager::sidebarWidth() const { return m_sidebarWidth; }
 bool ConfigManager::sidebarVisible() const { return m_sidebarVisible; }
+QStringList ConfigManager::hiddenQuickAccess() const { return m_hiddenQuickAccess; }
 QStringList ConfigManager::bookmarks() const { return m_bookmarks; }
 int ConfigManager::radiusSmall() const { return m_radiusSmall; }
 int ConfigManager::radiusMedium() const { return m_radiusMedium; }
@@ -498,6 +516,11 @@ void ConfigManager::saveSettings(const QVariantMap &settings)
         general.insert_or_assign("show_hidden", m_showHidden);
     }
 
+    if (settings.contains("dependencyStartupCheck")) {
+        m_dependencyStartupCheck = settings.value("dependencyStartupCheck").toBool();
+        general.insert_or_assign("dependency_startup_check", m_dependencyStartupCheck);
+    }
+
     if (settings.contains("sortBy")) {
         const QString sortBy = settings.value("sortBy").toString().trimmed();
         if (!sortBy.isEmpty()) {
@@ -539,6 +562,15 @@ void ConfigManager::saveSettings(const QVariantMap &settings)
             m_sidebarPosition = pos;
             sidebar.insert_or_assign("position", pos.toStdString());
         }
+    }
+
+    if (settings.contains("hiddenQuickAccess")) {
+        m_hiddenQuickAccess = settings.value("hiddenQuickAccess").toStringList();
+        m_hiddenQuickAccess.removeDuplicates();
+        toml::array hidden;
+        for (const QString &name : m_hiddenQuickAccess)
+            hidden.push_back(name.toStdString());
+        sidebar.insert_or_assign("hidden_quick_access", std::move(hidden));
     }
 
     if (!sidebar.empty())

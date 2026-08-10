@@ -228,6 +228,78 @@ private slots:
         QCOMPARE(mgr2.windowButtonLayout(), QString("close:minimize"));
     }
 
+    void testDependencyStartupCheckOptOut()
+    {
+        QTemporaryDir dir;
+        QString path = dir.path() + "/config.toml";
+
+        ConfigManager mgr(path);
+        QCOMPARE(mgr.dependencyStartupCheck(), true);
+
+        // "Don't show again" in the missing-dependencies dialog.
+        mgr.saveSettings(QVariantMap{{"dependencyStartupCheck", false}});
+
+        ConfigManager mgr2(path);
+        QCOMPARE(mgr2.dependencyStartupCheck(), false);
+
+        mgr2.saveSettings(QVariantMap{{"dependencyStartupCheck", true}});
+        ConfigManager mgr3(path);
+        QCOMPARE(mgr3.dependencyStartupCheck(), true);
+    }
+
+    void testSaveHiddenQuickAccess()
+    {
+        QTemporaryDir dir;
+        QString path = dir.path() + "/config.toml";
+
+        ConfigManager mgr(path);
+        QCOMPARE(mgr.hiddenQuickAccess(), QStringList());
+
+        mgr.saveSettings(QVariantMap{
+            {"hiddenQuickAccess", QStringList{"Pictures", "Network"}}
+        });
+
+        ConfigManager mgr2(path);
+        QCOMPARE(mgr2.hiddenQuickAccess(), QStringList({"Pictures", "Network"}));
+
+        // QML hands the value over as a QVariantList of strings.
+        mgr2.saveSettings(QVariantMap{
+            {"hiddenQuickAccess", QVariantList{QString("Trash")}}
+        });
+        ConfigManager mgr3(path);
+        QCOMPARE(mgr3.hiddenQuickAccess(), QStringList({"Trash"}));
+
+        // Unhiding everything must clear the stored list, not keep stale names.
+        mgr3.saveSettings(QVariantMap{{"hiddenQuickAccess", QStringList{}}});
+        ConfigManager mgr4(path);
+        QCOMPARE(mgr4.hiddenQuickAccess(), QStringList());
+    }
+
+    // Hand-edited config: both new keys must be read straight from TOML.
+    void testLoadSidebarAndDependencyKeys()
+    {
+        QTemporaryDir dir;
+        QString path = dir.path() + "/config.toml";
+
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("[general]\n"
+                "dependency_startup_check = false\n"
+                "[sidebar]\n"
+                "hidden_quick_access = [\"Network\", \"Recents\"]\n");
+        f.close();
+
+        ConfigManager mgr(path);
+        QCOMPARE(mgr.dependencyStartupCheck(), false);
+        QCOMPARE(mgr.hiddenQuickAccess(), QStringList({"Network", "Recents"}));
+
+        // Writing an unrelated setting must not drop either key.
+        mgr.saveSettings(QVariantMap{{"showHidden", true}});
+        ConfigManager mgr2(path);
+        QCOMPARE(mgr2.dependencyStartupCheck(), false);
+        QCOMPARE(mgr2.hiddenQuickAccess(), QStringList({"Network", "Recents"}));
+    }
+
     // --- Animation config ---
 
     void testAnimationDefaults()

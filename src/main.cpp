@@ -101,12 +101,20 @@ int main(int argc, char *argv[])
     // for a path. Relative paths are resolved against the caller's cwd
     // before the single-instance handoff, so the receiving process sees
     // an absolute path regardless of where the launcher invoked us from.
+    //
+    // `--new-window` (`-n`) forces a standalone window even when a path is
+    // given, i.e. it opts out of the tab handoff described below.
     QString initialOpenPath;
+    bool newWindow = false;
     for (int i = 1; i < argc; ++i) {
         QString a = QString::fromLocal8Bit(argv[i]);
+        if (a == QLatin1String("--new-window") || a == QLatin1String("-n")) {
+            newWindow = true;
+            continue;
+        }
         if (a.startsWith('-')) continue;
-        initialOpenPath = a;
-        break;
+        if (initialOpenPath.isEmpty())
+            initialOpenPath = a;
     }
     if (!initialOpenPath.isEmpty()) {
         QFileInfo fi(initialOpenPath);
@@ -131,24 +139,44 @@ int main(int argc, char *argv[])
     };
     mark("QGuiApplication ready");
 
-    // Single-instance: if another HyprFM is already running for this user,
-    // forward our arg over a per-uid unix domain socket and exit. The
-    // running instance spawns a new tab for the path. Mirrors how browsers
-    // handle `firefox <url>` when a window is already open.
+    // Launching HyprFM again opens another independent window, the way every
+    // other file manager behaves. The one exception is `hyprfm <path>` while
+    // an instance is already running: that forwards the path over a per-uid
+    // unix socket so the running window gains a tab, which is what desktop
+    // launchers and `xdg-open` rely on. `--new-window` opts out of even that.
+    //
+    // The process that manages to listen on the socket is the "primary" one:
+    // it answers those handoffs and owns the saved session (tabs + geometry).
+    // Extra windows are ordinary processes that share nothing with it.
     const QString hyprfmSocketName = QStringLiteral("hyprfm-%1").arg(static_cast<uint>(getuid()));
+    QLocalServer *ipcServer = nullptr;
+    bool isPrimary = false;
     {
         QLocalSocket probe;
         probe.connectToServer(hyprfmSocketName);
-        if (probe.waitForConnected(150)) {
+        const bool instanceRunning = probe.waitForConnected(150);
+
+        if (instanceRunning && !newWindow && !initialOpenPath.isEmpty()) {
             QJsonObject msg;
-            if (!initialOpenPath.isEmpty())
-                msg.insert(QStringLiteral("path"), initialOpenPath);
+            msg.insert(QStringLiteral("path"), initialOpenPath);
             QByteArray payload = QJsonDocument(msg).toJson(QJsonDocument::Compact);
             payload.append('\n');
             probe.write(payload);
             probe.waitForBytesWritten(500);
-            probe.disconnectFromServer();
             return 0;
+        }
+
+        if (!instanceRunning) {
+            // Nobody answered, so any socket file left behind is stale and
+            // would block listen(). Two instances starting at the exact same
+            // moment can both land here; the second simply wins the socket,
+            // which costs nothing but the first one's handoff duty.
+            QLocalServer::removeServer(hyprfmSocketName);
+            ipcServer = new QLocalServer(&app);
+            ipcServer->setSocketOptions(QLocalServer::UserAccessOption);
+            if (!ipcServer->listen(hyprfmSocketName))
+                qWarning() << "HyprFM: single-instance IPC listen failed:" << ipcServer->errorString();
+            isPrimary = ipcServer->isListening();
         }
     }
 
@@ -230,7 +258,7 @@ int main(int argc, char *argv[])
     // Restore session (tabs + window geometry)
     const QString sessionPath = configDir + "/session.json";
     QJsonObject sessionData;
-    {
+    if (isPrimary) {
         QFile sf(sessionPath);
         if (sf.open(QIODevice::ReadOnly)) {
             QJsonParseError parseError;
@@ -242,6 +270,13 @@ int main(int argc, char *argv[])
     if (sessionData.contains("tabs"))
         tabModel->restoreSession(sessionData.value("tabs").toArray(),
                                  sessionData.value("activeTab").toInt(0));
+
+    // A secondary window has no session to restore, so point its single tab
+    // straight at the requested path instead of opening a second tab later.
+    if (!isPrimary && !initialOpenPath.isEmpty()) {
+        if (auto *tab = tabModel->activeTab())
+            tab->navigateTo(initialOpenPath);
+    }
 
     BookmarkModel *bookmarks = new BookmarkModel(&app);
     bookmarks->setBookmarks(config->bookmarks());
@@ -451,6 +486,11 @@ int main(int argc, char *argv[])
     sessionSaveTimer.setInterval(250);
 
     auto saveSession = [&]() {
+        // Secondary windows share no state with the primary instance, so they
+        // must not overwrite its saved tabs/geometry.
+        if (!isPrimary)
+            return;
+
         QJsonObject session;
         session["tabs"] = tabModel->saveSession();
         session["activeTab"] = tabModel->activeIndex();
@@ -547,33 +587,31 @@ int main(int argc, char *argv[])
         }
     };
 
-    // Stale socket from a crashed previous instance would block listen().
-    QLocalServer::removeServer(hyprfmSocketName);
-    QLocalServer *ipcServer = new QLocalServer(&app);
-    ipcServer->setSocketOptions(QLocalServer::UserAccessOption);
-    if (!ipcServer->listen(hyprfmSocketName)) {
-        qWarning() << "HyprFM: single-instance IPC listen failed:" << ipcServer->errorString();
+    // The socket was opened before the session load; now that the window and
+    // the navigation helper exist, start answering handoffs on it.
+    if (isPrimary) {
+        QObject::connect(ipcServer, &QLocalServer::newConnection, &app, [ipcServer, openPathInNewTab]() {
+            while (QLocalSocket *conn = ipcServer->nextPendingConnection()) {
+                QObject::connect(conn, &QLocalSocket::readyRead, conn, [conn, openPathInNewTab]() {
+                    const QByteArray data = conn->readAll();
+                    for (const QByteArray &line : data.split('\n')) {
+                        const QByteArray trimmed = line.trimmed();
+                        if (trimmed.isEmpty()) continue;
+                        QJsonParseError err;
+                        const QJsonDocument doc = QJsonDocument::fromJson(trimmed, &err);
+                        if (err.error != QJsonParseError::NoError || !doc.isObject()) continue;
+                        openPathInNewTab(doc.object().value(QStringLiteral("path")).toString());
+                    }
+                });
+                QObject::connect(conn, &QLocalSocket::disconnected, conn, &QObject::deleteLater);
+            }
+        });
     }
-    QObject::connect(ipcServer, &QLocalServer::newConnection, &app, [ipcServer, openPathInNewTab]() {
-        while (QLocalSocket *conn = ipcServer->nextPendingConnection()) {
-            QObject::connect(conn, &QLocalSocket::readyRead, conn, [conn, openPathInNewTab]() {
-                const QByteArray data = conn->readAll();
-                for (const QByteArray &line : data.split('\n')) {
-                    const QByteArray trimmed = line.trimmed();
-                    if (trimmed.isEmpty()) continue;
-                    QJsonParseError err;
-                    const QJsonDocument doc = QJsonDocument::fromJson(trimmed, &err);
-                    if (err.error != QJsonParseError::NoError || !doc.isObject()) continue;
-                    openPathInNewTab(doc.object().value(QStringLiteral("path")).toString());
-                }
-            });
-            QObject::connect(conn, &QLocalSocket::disconnected, conn, &QObject::deleteLater);
-        }
-    });
 
     // Apply the path this process was launched with (if any) as a new tab
-    // on the restored session.
-    if (!initialOpenPath.isEmpty())
+    // on the restored session. Secondary windows already navigated their
+    // single tab above.
+    if (!initialOpenPath.isEmpty() && isPrimary)
         QTimer::singleShot(0, &app, [=]() { openPathInNewTab(initialOpenPath); });
 
     return app.exec();

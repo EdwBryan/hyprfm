@@ -190,7 +190,7 @@ cmake --build build --parallel
 | `F9` | Toggle sidebar |
 | `Ctrl+H` | Toggle hidden files |
 
-### Tabs
+### Tabs & windows
 
 | Shortcut | Action |
 |----------|--------|
@@ -198,6 +198,16 @@ cmake --build build --parallel
 | `Ctrl+W` | Close tab |
 | `Ctrl+Shift+T` | Reopen closed tab |
 | `Ctrl+Tab` / `Ctrl+Shift+Tab` | Cycle tabs |
+| `Ctrl+Alt+N` | New window |
+
+Launching `hyprfm` while it is already running opens another independent
+window. The one exception is `hyprfm <path>` — that forwards the path to the
+running window as a new tab, so desktop launchers and `xdg-open` keep behaving
+as expected. Pass `--new-window` (or `-n`) to get a separate window for a path
+too.
+
+Only the first window keeps the saved session (tabs + window geometry);
+additional windows start fresh and leave it untouched.
 
 ### File operations
 
@@ -227,6 +237,7 @@ icon_theme = "Adwaita"         # system icon theme fallback
 builtin_icons = true           # use bundled SVG icons
 default_view = "grid"          # grid | detailed | miller
 show_hidden = false
+dependency_startup_check = true # warn on startup when a required tool is missing
 sort_by = "name"               # name | size | modified | type
 sort_ascending = true
 
@@ -234,6 +245,9 @@ sort_ascending = true
 position = "left"
 width = 200
 visible = true
+# Quick-access entries to hide. Valid names:
+# "Home", "Recents", "Trash", "Network", "Pictures", "Downloads"
+hidden_quick_access = []
 
 [appearance]
 radius_small = 4

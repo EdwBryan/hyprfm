@@ -74,7 +74,11 @@ Window {
     property string draftIconTheme: config.iconTheme
     property bool draftDarkMode: true
     property bool draftShowHidden: currentShowHidden
+    property bool draftDependencyStartupCheck: config.dependencyStartupCheck
     property bool draftSidebarVisible: currentSidebarVisible
+    // Must stay in sync with the quick-access entries in Sidebar.qml.
+    readonly property var quickAccessNames: ["Home", "Recents", "Trash", "Network", "Pictures", "Downloads"]
+    property var draftHiddenQuickAccess: config.hiddenQuickAccess
     property string draftSidebarPosition: config.sidebarPosition
     property int draftSidebarWidth: currentSidebarWidth
     property int draftRadiusSmall: config.radiusSmall
@@ -116,6 +120,11 @@ Window {
         }
     }
 
+    function setQuickAccessVisible(name, visible) {
+        var rest = draftHiddenQuickAccess.filter(function(n) { return n !== name })
+        draftHiddenQuickAccess = visible ? rest : rest.concat(name)
+    }
+
     function rebuildButtonLayout(side, hasClose, hasMinimize, hasMaximize) {
         var buttons = []
         if (hasMinimize) buttons.push("minimize")
@@ -128,6 +137,7 @@ Window {
 
     signal remoteConnectRequested()
     signal keyboardShortcutsRequested()
+    signal dependenciesRequested()
     signal closed()
 
     readonly property string systemFontLabel: "System Default"
@@ -238,7 +248,9 @@ Window {
         draftFontFamily = ""
         draftIconTheme = defaultIconThemeName
         draftShowHidden = false
+        draftDependencyStartupCheck = true
         draftSidebarVisible = true
+        draftHiddenQuickAccess = []
         draftSidebarPosition = defaultSidebarPosition
         draftSidebarWidth = defaultSidebarWidth
         draftRadiusSmall = defaultRadiusSmall
@@ -276,7 +288,9 @@ Window {
             iconThemeOptions = buildOptions(availableIconThemeValues, draftIconTheme, "Adwaita")
 
             draftShowHidden = currentShowHidden
+            draftDependencyStartupCheck = config.dependencyStartupCheck
             draftSidebarVisible = currentSidebarVisible
+            draftHiddenQuickAccess = config.hiddenQuickAccess
             draftSidebarPosition = config.sidebarPosition
             draftSidebarWidth = currentSidebarWidth
             draftRadiusSmall = config.radiusSmall
@@ -331,13 +345,20 @@ Window {
         keyboardShortcutsRequested()
     }
 
+    function openDependencies() {
+        closePanel()
+        dependenciesRequested()
+    }
+
     function currentSettings() {
         return {
             theme: draftTheme,
             fontFamily: draftFontFamily,
             iconTheme: draftIconTheme,
             showHidden: draftShowHidden,
+            dependencyStartupCheck: draftDependencyStartupCheck,
             sidebarVisible: draftSidebarVisible,
+            hiddenQuickAccess: draftHiddenQuickAccess,
             sidebarPosition: draftSidebarPosition,
             sidebarWidth: draftSidebarWidth,
             radiusSmall: draftRadiusSmall,
@@ -627,6 +648,30 @@ Window {
                 onMoved: (value) => {
                     root.draftSidebarWidth = Math.round(value)
                     root.queueSettingsApply()
+                }
+            }
+
+            Text {
+                text: "Quick Access"
+                color: Theme.accent
+                font.pointSize: Theme.fontSmall
+                font.bold: true
+                Layout.topMargin: 12
+                Layout.bottomMargin: 4
+            }
+
+            Repeater {
+                model: root.quickAccessNames
+
+                Q.Toggle {
+                    Layout.fillWidth: true
+                    label: modelData
+                    enabled: root.draftSidebarVisible
+                    checked: root.draftHiddenQuickAccess.indexOf(modelData) < 0
+                    onToggled: (value) => {
+                        root.setQuickAccessVisible(modelData, value)
+                        root.applySettingsNow()
+                    }
                 }
             }
 
@@ -937,6 +982,24 @@ Window {
                     text: "Connect to Network Location"
                     variant: "ghost"
                     onClicked: root.openRemoteConnect()
+                }
+
+                Q.Button {
+                    Layout.fillWidth: true
+                    text: "Check Dependencies"
+                    variant: "ghost"
+                    onClicked: root.openDependencies()
+                }
+            }
+
+            Q.Toggle {
+                Layout.fillWidth: true
+                Layout.topMargin: 8
+                label: "Warn about missing dependencies on startup"
+                checked: root.draftDependencyStartupCheck
+                onToggled: (value) => {
+                    root.draftDependencyStartupCheck = value
+                    root.applySettingsNow()
                 }
             }
         }

@@ -20,12 +20,14 @@ class ConfigManager : public QObject
     Q_PROPERTY(QString fontFamily READ fontFamily NOTIFY configChanged)
     Q_PROPERTY(QString defaultView READ defaultView NOTIFY configChanged)
     Q_PROPERTY(bool showHidden READ showHidden NOTIFY configChanged)
+    Q_PROPERTY(bool dependencyStartupCheck READ dependencyStartupCheck NOTIFY configChanged)
     Q_PROPERTY(QString sortBy READ sortBy NOTIFY configChanged)
     Q_PROPERTY(bool sortAscending READ sortAscending NOTIFY configChanged)
     Q_PROPERTY(bool rememberSortPerFolder READ rememberSortPerFolder NOTIFY configChanged)
     Q_PROPERTY(QString sidebarPosition READ sidebarPosition NOTIFY configChanged)
     Q_PROPERTY(int sidebarWidth READ sidebarWidth NOTIFY configChanged)
     Q_PROPERTY(bool sidebarVisible READ sidebarVisible NOTIFY configChanged)
+    Q_PROPERTY(QStringList hiddenQuickAccess READ hiddenQuickAccess NOTIFY configChanged)
     Q_PROPERTY(QStringList bookmarks READ bookmarks NOTIFY configChanged)
     Q_PROPERTY(int radiusSmall READ radiusSmall NOTIFY configChanged)
     Q_PROPERTY(int radiusMedium READ radiusMedium NOTIFY configChanged)
@@ -58,12 +60,14 @@ public:
     QString fontFamily() const;
     QString defaultView() const;
     bool showHidden() const;
+    bool dependencyStartupCheck() const;
     QString sortBy() const;
     bool sortAscending() const;
     bool rememberSortPerFolder() const;
     QString sidebarPosition() const;
     int sidebarWidth() const;
     bool sidebarVisible() const;
+    QStringList hiddenQuickAccess() const;
     QStringList bookmarks() const;
     int radiusSmall() const;
     int radiusMedium() const;
@@ -120,12 +124,14 @@ private:
     QString m_fontFamily;
     QString m_defaultView;
     bool m_showHidden;
+    bool m_dependencyStartupCheck;
     QString m_sortBy;
     bool m_sortAscending;
     bool m_rememberSortPerFolder;
     QString m_sidebarPosition;
     int m_sidebarWidth;
     bool m_sidebarVisible;
+    QStringList m_hiddenQuickAccess;
     QStringList m_bookmarks;
     int m_radiusSmall;
     int m_radiusMedium;
