@@ -177,3 +177,14 @@ set_tests_properties(tst_instance_launch PROPERTIES
     RUN_SERIAL TRUE
     TIMEOUT 120
 )
+
+# --help / --version answer before any Qt GUI setup, so unlike the launch test
+# these run anywhere, including headless CI.
+add_test(NAME tst_cli_help COMMAND hyprfm --help)
+set_tests_properties(tst_cli_help PROPERTIES
+    PASS_REGULAR_EXPRESSION "-n, --new-window"
+)
+add_test(NAME tst_cli_version COMMAND hyprfm --version)
+set_tests_properties(tst_cli_version PROPERTIES
+    PASS_REGULAR_EXPRESSION "^hyprfm [0-9]+\\.[0-9]+\\.[0-9]+"
+)

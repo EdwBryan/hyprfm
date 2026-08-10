@@ -209,6 +209,8 @@ too.
 Only the first window keeps the saved session (tabs + window geometry);
 additional windows start fresh and leave it untouched.
 
+Run `hyprfm --help` for the full list of flags and environment variables.
+
 ### File operations
 
 | Shortcut | Action |

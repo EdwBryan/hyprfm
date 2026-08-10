@@ -198,6 +198,7 @@ set(HYPRFM_DATA_DIR "${CMAKE_SOURCE_DIR}" CACHE STRING "Runtime data directory f
 target_compile_definitions(hyprfm PRIVATE
     HYPRFM_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
     HYPRFM_DATA_DIR="${HYPRFM_DATA_DIR}"
+    HYPRFM_VERSION="${PROJECT_VERSION}"
 )
 
 if(KF6WindowSystem_FOUND)

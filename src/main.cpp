@@ -54,8 +54,52 @@
 #include <QIcon>
 #include <QUrl>
 
+namespace {
+
+// Printed by --help. Qt's QCommandLineParser would need a constructed
+// QCoreApplication, and both --help and --version have to answer before the
+// Wayland check below — `hyprfm --help` over SSH should still work.
+void printUsage()
+{
+    printf(
+        "HyprFM %s — a Qt6/QML file manager for Wayland\n"
+        "\n"
+        "Usage:\n"
+        "  hyprfm [options] [path]\n"
+        "\n"
+        "With no path, launching HyprFM while it is already running opens\n"
+        "another window. With a path, the running window gains a tab instead,\n"
+        "unless --new-window is given.\n"
+        "\n"
+        "Options:\n"
+        "  -n, --new-window   Open a separate window even when a path is given.\n"
+        "  -h, --help         Show this help and exit.\n"
+        "  -v, --version      Show the version and exit.\n"
+        "\n"
+        "Environment:\n"
+        "  HYPRFM_TIMING=1    Print startup timings to stderr.\n"
+        "  HYPRFM_MSAA=2|4    Enable full-window multisampling (costly).\n"
+        "\n"
+        "Qt options such as -style are accepted and passed through.\n",
+        HYPRFM_VERSION);
+}
+
+} // namespace
+
 int main(int argc, char *argv[])
 {
+    for (int i = 1; i < argc; ++i) {
+        const QLatin1StringView a(argv[i]);
+        if (a == "-h" || a == "--help") {
+            printUsage();
+            return 0;
+        }
+        if (a == "-v" || a == "--version") {
+            printf("hyprfm %s\n", HYPRFM_VERSION);
+            return 0;
+        }
+    }
+
     // Suppress noisy warnings:
     //   - qt.qpa.services: harmless portal registration warning on non-sandboxed apps
     //   - qt.svg: Qt's SVG parser complains about unsupported filter elements

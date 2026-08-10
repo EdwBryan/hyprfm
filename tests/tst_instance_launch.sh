@@ -47,6 +47,21 @@ spawn() {
 
 yesno() { kill -0 "$1" 2>/dev/null && echo yes || echo no; }
 
+# Poll instead of sleeping a fixed amount: a cold start right after a relink
+# can take several seconds, and a hardcoded wait turns that into a flake.
+wait_for() {
+    local deadline=$((SECONDS + $1)); shift
+    while [ "$SECONDS" -lt "$deadline" ]; do
+        "$@" >/dev/null 2>&1 && return 0
+        sleep 0.2
+    done
+    return 1
+}
+
+socket_up() { [ -S "$SOCKET" ]; }
+tabs() { grep -o '"path"' "$SESSION" 2>/dev/null | wc -l; }
+more_tabs_than() { [ "$(tabs)" -gt "$1" ]; }
+
 check() {
     if [ "$2" = "$3" ]; then
         echo "PASS: $1"
@@ -59,18 +74,18 @@ check() {
 # --- 1. first launch becomes primary and owns the socket -------------------
 spawn; primary=$SPAWNED
 check "first launch stays alive" "$(yesno "$primary")" "yes"
-check "first launch owns the IPC socket" "$([ -S "$SOCKET" ] && echo yes || echo no)" "yes"
+wait_for 20 socket_up
+check "first launch owns the IPC socket" "$(socket_up && echo yes || echo no)" "yes"
 
 # --- 2. path handoff: no new process, primary gains a tab ------------------
 # The session file only appears once something changes, hence the missing-file
 # tolerance on the "before" count.
-tabs_before=$(grep -o '"path"' "$SESSION" 2>/dev/null | wc -l)
+tabs_before=$(tabs)
 "$HYPRFM" /etc >/dev/null 2>&1
 check "hyprfm <path> exits 0 while an instance runs" "$?" "0"
-sleep 2
-tabs_after=$(grep -o '"path"' "$SESSION" 2>/dev/null | wc -l)
+wait_for 10 more_tabs_than "$tabs_before"
 check "handoff added a tab to the primary" \
-      "$([ "$tabs_after" -gt "$tabs_before" ] && echo yes || echo no)" "yes"
+      "$(more_tabs_than "$tabs_before" && echo yes || echo no)" "yes"
 
 # --- 3. bare relaunch opens an independent window --------------------------
 spawn; second=$SPAWNED
@@ -88,8 +103,9 @@ check "secondary window left session.json untouched" \
 kill -9 "$primary" "$second" 2>/dev/null
 wait "$primary" "$second" 2>/dev/null   # reap quietly, no "Killed" job notices
 sleep 1
-check "crash leaves a stale socket behind" "$([ -S "$SOCKET" ] && echo yes || echo no)" "yes"
+check "crash leaves a stale socket behind" "$(socket_up && echo yes || echo no)" "yes"
 spawn; revived=$SPAWNED
+wait_for 20 socket_up
 check "launch after crash starts despite the stale socket" "$(yesno "$revived")" "yes"
 "$HYPRFM" /etc >/dev/null 2>&1
 check "revived instance answers handoffs" "$?" "0"
