@@ -13,6 +13,7 @@
 #include <QMimeData>
 #include <QPixmap>
 #include <QRegularExpression>
+#include <QSettings>
 #include <QSet>
 #include <QStandardPaths>
 #include <QStorageInfo>
@@ -35,6 +36,33 @@ bool runningInFlatpak()
 {
     static const bool inSandbox = QFile::exists(QStringLiteral("/.flatpak-info"));
     return inSandbox;
+}
+
+// Locate a .desktop file from its desktop ID ("mpv.desktop"). Under Flatpak
+// the host's applications are only visible through /run/host, so search there
+// too — the caller strips the prefix back off before handing the path to the
+// host process.
+QString desktopEntryPath(const QString &desktopId)
+{
+    if (desktopId.isEmpty())
+        return {};
+    if (QFileInfo(desktopId).isAbsolute())
+        return QFile::exists(desktopId) ? desktopId : QString();
+
+    QStringList dirs = QStandardPaths::standardLocations(QStandardPaths::ApplicationsLocation);
+    if (runningInFlatpak()) {
+        for (const QString &dir : std::as_const(dirs)) {
+            if (dir.startsWith(QLatin1Char('/')))
+                dirs.append(QStringLiteral("/run/host") + dir);
+        }
+    }
+
+    for (const QString &dir : std::as_const(dirs)) {
+        const QString candidate = QDir(dir).filePath(desktopId);
+        if (QFile::exists(candidate))
+            return candidate;
+    }
+    return {};
 }
 
 bool isTrashUriPath(const QString &path)
@@ -1586,20 +1614,119 @@ void FileOperations::emptyTrash()
         });
 }
 
+// Turn a desktop entry's Exec= line into an argv, substituting the file for
+// whichever field code the entry uses. Public and static so it can be tested
+// without launching anything.
+QStringList FileOperations::desktopExecArguments(const QString &execLine, const QString &file)
+{
+    QStringList argv;
+    bool fileConsumed = false;
+
+    const QStringList parts = QProcess::splitCommand(execLine);
+    for (const QString &part : parts) {
+        // %f/%F take a path, %u/%U a URI; a local path satisfies both.
+        if (part == QLatin1String("%f") || part == QLatin1String("%F")
+            || part == QLatin1String("%u") || part == QLatin1String("%U")) {
+            if (!file.isEmpty()) {
+                argv.append(file);
+                fileConsumed = true;
+            }
+            continue;
+        }
+        // %i, %c, %k and the deprecated codes carry no meaning for us.
+        if (part.size() == 2 && part.startsWith(QLatin1Char('%')))
+            continue;
+
+        QString literal = part;
+        argv.append(literal.replace(QLatin1String("%%"), QLatin1String("%")));
+    }
+
+    // Entries that declare no field code still expect the file as a trailing
+    // argument — that is how a launcher would pass it.
+    if (!fileConsumed && !file.isEmpty())
+        argv.append(file);
+
+    return argv;
+}
+
 void FileOperations::openFileWith(const QString &path, const QString &desktopFile)
 {
-    auto *proc = new QProcess(this);
-    connect(proc, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
-            proc, &QProcess::deleteLater);
-
     const QString normalized = normalizeLocation(path);
-    if (runningInFlatpak()) {
-        proc->start(QStringLiteral("flatpak-spawn"),
-                    {QStringLiteral("--host"),
-                     QStringLiteral("gtk-launch"), desktopFile, normalized});
-    } else {
-        proc->start(QStringLiteral("gtk-launch"), {desktopFile, normalized});
+    const QString entryPath = desktopEntryPath(desktopFile);
+    if (entryPath.isEmpty()) {
+        emit operationFinished(false,
+            QStringLiteral("Could not find the application entry '%1'").arg(desktopFile));
+        return;
     }
+
+    QSettings entry(entryPath, QSettings::IniFormat);
+    entry.beginGroup(QStringLiteral("Desktop Entry"));
+
+    QString program;
+    QStringList args;
+
+    if (entry.value(QStringLiteral("Terminal")).toString()
+            .compare(QLatin1String("true"), Qt::CaseInsensitive) == 0) {
+        // GLib refuses to launch Terminal=true entries unless it recognises an
+        // installed terminal ("Unable to find terminal required for
+        // application"), which silently rules out micro, nvim, nano and every
+        // other TUI editor. Run those ourselves through $TERMINAL instead.
+        const QStringList command =
+            desktopExecArguments(entry.value(QStringLiteral("Exec")).toString(), normalized);
+        if (command.isEmpty()) {
+            emit operationFinished(false,
+                QStringLiteral("'%1' has no runnable Exec line").arg(desktopFile));
+            return;
+        }
+        program = qEnvironmentVariable("TERMINAL", QStringLiteral("kitty"));
+        args = QStringList{QStringLiteral("-e")} + command;
+    } else {
+        // `gio launch` comes from glib2, which HyprFM already requires; the
+        // gtk-launch this used to call lives in gtk3 and is often absent.
+        QString hostEntryPath = entryPath;
+        if (hostEntryPath.startsWith(QLatin1String("/run/host/")))
+            hostEntryPath.remove(0, qstrlen("/run/host"));
+        program = QStringLiteral("gio");
+        args = {QStringLiteral("launch"), hostEntryPath, normalized};
+    }
+
+    if (runningInFlatpak()) {
+        args.prepend(program);
+        args.prepend(QStringLiteral("--host"));
+        program = QStringLiteral("flatpak-spawn");
+    }
+
+    auto *proc = new QProcess(this);
+    connect(proc, &QProcess::errorOccurred, proc, [this, proc, program](QProcess::ProcessError e) {
+        if (e == QProcess::FailedToStart) {
+            emit operationFinished(false,
+                QStringLiteral("Could not run '%1' — is it installed?").arg(program));
+        }
+        proc->deleteLater();
+    });
+    connect(proc, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), proc,
+            [this, proc](int exitCode, QProcess::ExitStatus) {
+        // gio exits as soon as the app is launched, so a non-zero code here is
+        // a launch failure worth surfacing rather than the app's own exit.
+        if (exitCode != 0) {
+            const QString details = QString::fromUtf8(proc->readAllStandardError()).trimmed();
+            emit operationFinished(false, details.isEmpty()
+                ? QStringLiteral("Failed to open the file with that application")
+                : details);
+        }
+        proc->deleteLater();
+    });
+
+    // A terminal stays alive for as long as its window is open, and the TUI's
+    // own exit code would be misread as a launch failure, so only spawn errors
+    // are interesting there.
+    if (program == qEnvironmentVariable("TERMINAL", QStringLiteral("kitty"))) {
+        proc->startDetached(program, args);
+        proc->deleteLater();
+        return;
+    }
+
+    proc->start(program, args);
 }
 
 bool FileOperations::hasClipboardImage() const

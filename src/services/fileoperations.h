@@ -66,6 +66,7 @@ public:
     Q_INVOKABLE QVariantList breadcrumbSegments(const QString &path) const;
     Q_INVOKABLE void emptyTrash();
     Q_INVOKABLE void openFileWith(const QString &path, const QString &desktopFile);
+    static QStringList desktopExecArguments(const QString &execLine, const QString &file);
     Q_INVOKABLE bool hasClipboardImage() const;
     Q_INVOKABLE QString pasteClipboardImage(const QString &destinationDir);
     Q_INVOKABLE void copyPathToClipboard(const QString &path);

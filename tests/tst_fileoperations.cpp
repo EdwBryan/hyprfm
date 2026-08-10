@@ -88,6 +88,40 @@ private slots:
         QStandardPaths::setTestModeEnabled(true);
     }
 
+    // --- Desktop entry Exec= parsing (Open With) ---
+
+    void testDesktopExecArguments()
+    {
+        const QString file = "/tmp/clip.mkv";
+
+        // The common field codes all stand in for the file.
+        QCOMPARE(FileOperations::desktopExecArguments("mpv %U", file),
+                 QStringList({"mpv", file}));
+        QCOMPARE(FileOperations::desktopExecArguments("nvim %F", file),
+                 QStringList({"nvim", file}));
+
+        // Options around the field code survive, in order.
+        QCOMPARE(FileOperations::desktopExecArguments(
+                     "mpv --player-operation-mode=pseudo-gui -- %U", file),
+                 QStringList({"mpv", "--player-operation-mode=pseudo-gui", "--", file}));
+
+        // Codes that carry no meaning here are dropped, not passed through.
+        QCOMPARE(FileOperations::desktopExecArguments("app %i %c %k %U", file),
+                 QStringList({"app", file}));
+
+        // An entry with no field code still gets the file appended.
+        QCOMPARE(FileOperations::desktopExecArguments("micro", file),
+                 QStringList({"micro", file}));
+
+        // Quoted paths stay one argument, and %% is a literal percent.
+        QCOMPARE(FileOperations::desktopExecArguments("\"/opt/My App/run\" -x 100%% %f", file),
+                 QStringList({"/opt/My App/run", "-x", "100%", file}));
+
+        // No file to open: the field code just disappears.
+        QCOMPARE(FileOperations::desktopExecArguments("mpv %U", QString()),
+                 QStringList({"mpv"}));
+    }
+
     // --- Copy ---
 
     void testCopyFile()
