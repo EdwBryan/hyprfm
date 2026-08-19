@@ -270,12 +270,15 @@ void DependencyChecker::populate()
         buildHints(QStringLiteral("ntfs-3g"))
     });
 
+    const bool gvfsAvailable = hasExecutable(QStringLiteral("gio")) && hasAnyFile({
+        QStringLiteral("/usr/lib/gvfs"),
+        QStringLiteral("/usr/lib64/gvfs"),
+    });
     m_deps.append({
         QStringLiteral("gvfs"),
         QStringLiteral("GVFS backends"),
         QStringLiteral("Connect to remote file systems (SFTP, SMB, WebDAV)."),
-        Kind::Tool, false, hasExecutable(QStringLiteral("gio"))
-            && QDir(QStringLiteral("/usr/lib/gvfs")).exists(),
+        Kind::Tool, false, gvfsAvailable,
         {QStringLiteral("gio")},
         buildHints(QStringLiteral("gvfs"))
     });
@@ -283,6 +286,7 @@ void DependencyChecker::populate()
     const bool gvfsAfcAvailable = hasExecutable(QStringLiteral("gio")) && hasAnyFile({
         QStringLiteral("/usr/share/gvfs/mounts/afc.mount"),
         QStringLiteral("/usr/lib/gvfs/gvfsd-afc"),
+        QStringLiteral("/usr/lib64/gvfs/gvfsd-afc"),
         QStringLiteral("/usr/libexec/gvfsd-afc"),
     });
     m_deps.append({
@@ -302,6 +306,7 @@ void DependencyChecker::populate()
     const bool gvfsGphoto2Available = hasExecutable(QStringLiteral("gio")) && hasAnyFile({
         QStringLiteral("/usr/share/gvfs/mounts/gphoto2.mount"),
         QStringLiteral("/usr/lib/gvfs/gvfsd-gphoto2"),
+        QStringLiteral("/usr/lib64/gvfs/gvfsd-gphoto2"),
         QStringLiteral("/usr/libexec/gvfsd-gphoto2"),
     });
     m_deps.append({
