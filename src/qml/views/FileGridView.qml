@@ -525,6 +525,11 @@ GridView {
         id: delegateItem
         width: root.cellWidth
         height: root.cellHeight
+
+        // The remove transition leaves opacity/scale animated down, and
+        // reuseItems recycles that item as-is (view transitions never re-run
+        // on reuse) — without this reset the cell comes back blank.
+        GridView.onReused: { opacity = 1; scale = 1 }
         Accessible.role: Accessible.ListItem
         Accessible.name: fileName + (isDir ? ", folder" : "")
         Accessible.selected: isSelected

@@ -787,6 +787,48 @@ private slots:
         QDir(testPath).removeRecursively();
     }
 
+    // Permanently deleting a trashed *directory* must work: the gvfs trash
+    // backend refuses per-child deletes ("Items in the trash may not be
+    // modified"), so only a delete of the top-level trash entry succeeds.
+    void testDeleteTrashedDirectory()
+    {
+        if (QStandardPaths::findExecutable("gio").isEmpty())
+            QSKIP("gio not found in PATH");
+
+        const QString uniqueId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        const QString testPath = QDir::homePath() + "/.cache/hyprfm-test-delete-trash-dir-" + uniqueId;
+        const QString dirPath = testPath + "/doomed_folder";
+        QVERIFY(QDir().mkpath(dirPath + "/nested"));
+        {
+            QFile f(dirPath + "/nested/inside.txt");
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("delete me");
+            f.close();
+        }
+
+        FileOperations ops;
+        QSignalSpy spy(&ops, &FileOperations::operationFinished);
+
+        ops.trashFiles({dirPath});
+        if (!spy.wait(5000))
+            QSKIP("gio trash timed out (may not be supported in this environment)");
+        if (!spy.at(0).at(0).toBool())
+            QSKIP("gio trash failed (may not be supported for this path)");
+
+        const QString trashUri = findTrashEntryUri(dirPath);
+        if (trashUri.isEmpty())
+            QSKIP("Could not locate trashed directory URI");
+
+        spy.clear();
+        ops.deleteFiles({trashUri});
+        QVERIFY(spy.wait(10000));
+        QVERIFY2(spy.at(0).at(0).toBool(),
+                 qPrintable(spy.at(0).at(1).toString()));
+        QVERIFY(findTrashEntryUri(dirPath).isEmpty());
+
+        QDir(testPath).removeRecursively();
+    }
+
     void testTrashHelpersForHomePath()
     {
         FileOperations ops;

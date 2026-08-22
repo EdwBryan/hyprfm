@@ -740,6 +740,11 @@ FocusScope {
                 width: currentColumn.width
                 height: root.rowHeight
 
+                // The remove transition leaves opacity/scale animated down, and
+                // reuseItems recycles that item as-is (view transitions never
+                // re-run on reuse) — without this reset the row comes back blank.
+                ListView.onReused: { opacity = 1; scale = 1 }
+
                 required property int index
                 required property string fileName
                 required property string filePath

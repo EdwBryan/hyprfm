@@ -311,6 +311,19 @@ bool deleteGFileRecursive(GFile *file, QString *error, GCancellable *cancellable
         return ok;
     }
 
+    // Some backends own the recursion and refuse per-child deletes: the gvfs
+    // trash backend answers "Items in the trash may not be modified" for
+    // anything below a top-level entry, so walking into a trashed folder can
+    // never empty it. Try the whole-directory delete first; local filesystems
+    // just report G_IO_ERROR_NOT_EMPTY and we fall through to the walk.
+    {
+        GError *directErr = nullptr;
+        if (g_file_delete(file, cancellable, &directErr))
+            return true;
+        if (directErr)
+            g_error_free(directErr);
+    }
+
     GError *enumErr = nullptr;
     GFileEnumerator *enumerator = g_file_enumerate_children(
         file,
