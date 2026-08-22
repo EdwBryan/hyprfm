@@ -189,6 +189,8 @@ cmake --build build --parallel
 | `F3` | Toggle split pane |
 | `F9` | Toggle sidebar |
 | `Ctrl+H` | Toggle hidden files |
+| `Ctrl+Shift+B` | Toggle transparency |
+| `Ctrl+Shift+,` | Open `config.toml` in your editor |
 
 ### Tabs & windows
 

@@ -43,6 +43,7 @@ class ConfigManager : public QObject
     Q_PROPERTY(QString animCurveTransition READ animCurveTransition NOTIFY configChanged)
     Q_PROPERTY(bool showWindowControls READ showWindowControls NOTIFY configChanged)
     Q_PROPERTY(QString windowButtonLayout READ windowButtonLayout NOTIFY configChanged)
+    Q_PROPERTY(QString configPath READ configPath CONSTANT)
     Q_PROPERTY(QVariantMap shortcutMap READ shortcutMap NOTIFY configChanged)
     Q_PROPERTY(QVariantList shortcutDefinitions READ shortcutDefinitions NOTIFY configChanged)
 
@@ -54,6 +55,7 @@ public:
     QStringList availableFonts() const;
     QStringList availableIconThemes() const;
     QStringList availableThemes() const;
+    QString configPath() const;
     QString theme() const;
     QString iconTheme() const;
     bool builtinIcons() const;

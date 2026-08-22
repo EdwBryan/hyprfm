@@ -43,6 +43,7 @@ const ShortcutSpec kShortcutSpecs[] = {
     {"trash", "Move to Trash"},
     {"permanent_delete", "Permanent Delete"},
     {"toggle_hidden", "Toggle Hidden Files"},
+    {"toggle_transparency", "Toggle Transparency"},
     {"quick_preview", "Quick Preview"},
     {"search", "Search"},
     {"context_menu", "Show Context Menu"},
@@ -62,6 +63,7 @@ const ShortcutSpec kShortcutSpecs[] = {
     {"undo", "Undo"},
     {"redo", "Redo"},
     {"settings", "Open Settings"},
+    {"edit_config", "Edit config.toml"},
     {"keyboard_shortcuts", "Open Keyboard Shortcuts"},
 };
 
@@ -127,6 +129,7 @@ QMap<QString, QString> ConfigManager::s_defaultShortcuts = {
     {"trash", "Delete"},
     {"permanent_delete", "Shift+Delete"},
     {"toggle_hidden", "Ctrl+H"},
+    {"toggle_transparency", "Ctrl+Shift+B"},
     {"quick_preview", "Space"},
     {"search", "Ctrl+F"},
     {"context_menu", "Shift+F10"},
@@ -146,6 +149,7 @@ QMap<QString, QString> ConfigManager::s_defaultShortcuts = {
     {"undo", "Ctrl+Z"},
     {"redo", "Ctrl+Shift+Z"},
     {"settings", "Ctrl+,"},
+    {"edit_config", "Ctrl+Shift+,"},
     {"keyboard_shortcuts", "Ctrl+?"},
 };
 
@@ -411,6 +415,8 @@ QStringList ConfigManager::bookmarks() const { return m_bookmarks; }
 int ConfigManager::radiusSmall() const { return m_radiusSmall; }
 int ConfigManager::radiusMedium() const { return m_radiusMedium; }
 int ConfigManager::radiusLarge() const { return m_radiusLarge; }
+QString ConfigManager::configPath() const { return m_configPath; }
+
 bool ConfigManager::transparencyEnabled() const { return m_transparencyEnabled; }
 double ConfigManager::transparencyLevel() const { return m_transparencyLevel; }
 bool ConfigManager::animationsEnabled() const { return m_animationsEnabled; }

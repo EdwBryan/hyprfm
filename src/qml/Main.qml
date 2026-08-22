@@ -2914,6 +2914,29 @@ ApplicationWindow {
         onActivated: fsModel.showHidden = !fsModel.showHidden
     }
 
+    // Toggle transparency
+    Shortcut {
+        sequence: config.shortcutMap["toggle_transparency"]
+        onActivated: config.saveSettings({ transparencyEnabled: !config.transparencyEnabled })
+    }
+
+    // Open config.toml in the default editor — saves live-reload
+    Shortcut {
+        sequence: config.shortcutMap["edit_config"]
+        onActivated: {
+            // The file only exists once something has been saved, so seed it
+            // with the current theme/transparency before handing it to $EDITOR.
+            if (!fileOps.pathExists(config.configPath)) {
+                config.saveSettings({
+                    theme: config.theme,
+                    transparencyEnabled: config.transparencyEnabled,
+                    transparencyLevel: config.transparencyLevel
+                })
+            }
+            fileOps.openFile(config.configPath)
+        }
+    }
+
     // Toggle path bar focus (Ctrl+L-like)
     Shortcut {
         sequence: config.shortcutMap["path_bar"]
