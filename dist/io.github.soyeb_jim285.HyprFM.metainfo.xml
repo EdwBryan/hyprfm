@@ -42,15 +42,15 @@
   <screenshots>
     <screenshot type="default">
       <caption>Grid view with file preview</caption>
-      <image>https://raw.githubusercontent.com/soyeb-jim285/hyprfm/v0.5.1/docs/screenshots/grid-view.png</image>
+      <image>https://raw.githubusercontent.com/soyeb-jim285/hyprfm/v0.5.2/docs/screenshots/grid-view.png</image>
     </screenshot>
     <screenshot>
       <caption>Miller column view</caption>
-      <image>https://raw.githubusercontent.com/soyeb-jim285/hyprfm/v0.5.1/docs/screenshots/miller-view.png</image>
+      <image>https://raw.githubusercontent.com/soyeb-jim285/hyprfm/v0.5.2/docs/screenshots/miller-view.png</image>
     </screenshot>
     <screenshot>
       <caption>Quick preview overlay</caption>
-      <image>https://raw.githubusercontent.com/soyeb-jim285/hyprfm/v0.5.1/docs/screenshots/quick-preview.png</image>
+      <image>https://raw.githubusercontent.com/soyeb-jim285/hyprfm/v0.5.2/docs/screenshots/quick-preview.png</image>
     </screenshot>
   </screenshots>
 
@@ -66,6 +66,11 @@
   </provides>
 
   <releases>
+    <release version="0.5.2" date="2026-08-24">
+      <description>
+        <p>Fix live config reload dying when an editor replaces config.toml instead of writing it in place.</p>
+      </description>
+    </release>
     <release version="0.5.1" date="2026-08-22">
       <description>
         <p>Multiple windows, --help/--version flags, hideable sidebar entries, shortcuts for transparency and config editing, plus fixes for Open With, trash, breadcrumbs, and XDG user directories.</p>
