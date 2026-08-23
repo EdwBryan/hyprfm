@@ -42,15 +42,15 @@
   <screenshots>
     <screenshot type="default">
       <caption>Grid view with file preview</caption>
-      <image>https://raw.githubusercontent.com/soyeb-jim285/hyprfm/v0.5.2/docs/screenshots/grid-view.png</image>
+      <image>https://raw.githubusercontent.com/soyeb-jim285/hyprfm/v0.5.3/docs/screenshots/grid-view.png</image>
     </screenshot>
     <screenshot>
       <caption>Miller column view</caption>
-      <image>https://raw.githubusercontent.com/soyeb-jim285/hyprfm/v0.5.2/docs/screenshots/miller-view.png</image>
+      <image>https://raw.githubusercontent.com/soyeb-jim285/hyprfm/v0.5.3/docs/screenshots/miller-view.png</image>
     </screenshot>
     <screenshot>
       <caption>Quick preview overlay</caption>
-      <image>https://raw.githubusercontent.com/soyeb-jim285/hyprfm/v0.5.2/docs/screenshots/quick-preview.png</image>
+      <image>https://raw.githubusercontent.com/soyeb-jim285/hyprfm/v0.5.3/docs/screenshots/quick-preview.png</image>
     </screenshot>
   </screenshots>
 
@@ -66,6 +66,11 @@
   </provides>
 
   <releases>
+    <release version="0.5.3" date="2026-08-24">
+      <description>
+        <p>Keyboard tab switching with Ctrl+Tab, Ctrl+PgDown and Alt+1-9, and new tabs opening in the view you were already using.</p>
+      </description>
+    </release>
     <release version="0.5.2" date="2026-08-24">
       <description>
         <p>Fix live config reload dying when an editor replaces config.toml instead of writing it in place.</p>
