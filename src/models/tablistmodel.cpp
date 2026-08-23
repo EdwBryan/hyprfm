@@ -131,7 +131,10 @@ void TabListModel::addTab()
 {
     beginInsertRows(QModelIndex(), m_tabs.size(), m_tabs.size());
     auto *tab = new TabModel(this);
-    tab->setViewMode(m_defaultViewMode);
+    // A new tab continues what you were just doing: it inherits the current
+    // tab's view, falling back to the configured default when there is none.
+    const TabModel *current = activeTab();
+    tab->setViewMode(current ? current->viewMode() : m_defaultViewMode);
     m_tabs.append(tab);
     connectTab(m_tabs.size() - 1, tab);
     endInsertRows();

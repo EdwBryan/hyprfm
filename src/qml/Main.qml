@@ -1,4 +1,5 @@
 import QtQuick
+import QtQml
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Shapes
@@ -2862,6 +2863,29 @@ ApplicationWindow {
     Shortcut {
         sequence: config.shortcutMap["reopen_tab"]
         onActivated: tabModel.reopenClosedTab()
+    }
+
+    // Ctrl+Tab / Ctrl+Shift+Tab, with the PageUp/PageDown pair browsers use.
+    Shortcut {
+        sequences: [config.shortcutMap["next_tab"], "Ctrl+PgDown"]
+        onActivated: tabModel.activeIndex = (tabModel.activeIndex + 1) % tabModel.count
+    }
+
+    Shortcut {
+        sequences: [config.shortcutMap["previous_tab"], "Ctrl+PgUp"]
+        onActivated: tabModel.activeIndex =
+            (tabModel.activeIndex - 1 + tabModel.count) % tabModel.count
+    }
+
+    // Alt+1..9 jump straight to a tab; Alt+9 is the last one, as in browsers.
+    Instantiator {
+        model: 9
+        delegate: Shortcut {
+            required property int index
+            sequence: "Alt+" + (index + 1)
+            onActivated: tabModel.activeIndex =
+                index === 8 ? tabModel.count - 1 : Math.min(index, tabModel.count - 1)
+        }
     }
 
     Shortcut {

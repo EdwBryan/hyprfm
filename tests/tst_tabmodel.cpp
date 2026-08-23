@@ -272,6 +272,21 @@ private slots:
         QCOMPARE(model.activeTab()->viewMode(), QString("detailed"));
     }
 
+    void testTabListModelNewTabInheritsCurrentViewMode()
+    {
+        TabListModel model;
+        model.setDefaultViewMode("grid");
+        model.activeTab()->setViewMode("miller");
+
+        model.addTab();
+        QCOMPARE(model.activeTab()->viewMode(), QString("miller"));
+
+        // And it keeps following the tab you were on, not the first one.
+        model.activeTab()->setViewMode("detailed");
+        model.addTab();
+        QCOMPARE(model.activeTab()->viewMode(), QString("detailed"));
+    }
+
     void testTabListModelRestoreSessionFallsBackToDefaultViewMode()
     {
         TabListModel model;

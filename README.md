@@ -199,7 +199,10 @@ cmake --build build --parallel
 | `Ctrl+T` | New tab |
 | `Ctrl+W` | Close tab |
 | `Ctrl+Shift+T` | Reopen closed tab |
-| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Cycle tabs |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Next / previous tab |
+| `Ctrl+PgDown` / `Ctrl+PgUp` | Next / previous tab |
+| `Alt+1` … `Alt+8` | Jump to tab 1-8 |
+| `Alt+9` | Jump to the last tab |
 | `Ctrl+Alt+N` | New window |
 
 Launching `hyprfm` while it is already running opens another independent
