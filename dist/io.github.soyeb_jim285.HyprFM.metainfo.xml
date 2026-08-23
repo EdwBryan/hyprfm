@@ -68,7 +68,7 @@
   <releases>
     <release version="0.5.2" date="2026-08-24">
       <description>
-        <p>Keyboard tab switching with Ctrl+Tab, Ctrl+PgDown and Alt+1-9, new tabs inheriting the current view, and a fix for live config reload dying when an editor replaces config.toml instead of writing it in place.</p>
+        <p>Fix live config reload dying when an editor replaces config.toml instead of writing it in place.</p>
       </description>
     </release>
     <release version="0.5.1" date="2026-08-22">
