@@ -164,15 +164,31 @@ ConfigManager::ConfigManager(const QString &configPath, QObject *parent, const Q
     loadConfig();
     loadFolderSort();
 
-    if (QFile::exists(m_configPath)) {
+    // Editors save by writing a temp file and renaming over the target, which
+    // gives config.toml a new inode and silently drops a file-only watch. Watch
+    // the directory too — it survives the replacement — and re-arm the file
+    // watch from either signal.
+    m_configModified = QFileInfo(m_configPath).lastModified();
+    const auto rearmAndReload = [this]() {
+        const QFileInfo info(m_configPath);
+        if (!info.exists())
+            return;
+        if (!m_watcher.files().contains(m_configPath))
+            m_watcher.addPath(m_configPath);
+        // The directory also changes when session.json and friends are written,
+        // so only reload when config.toml itself moved on.
+        if (info.lastModified() == m_configModified)
+            return;
+        m_configModified = info.lastModified();
+        loadConfig();
+        emit configChanged();
+    };
+    connect(&m_watcher, &QFileSystemWatcher::fileChanged, this, rearmAndReload);
+    connect(&m_watcher, &QFileSystemWatcher::directoryChanged, this, rearmAndReload);
+
+    if (QFile::exists(m_configPath))
         m_watcher.addPath(m_configPath);
-        connect(&m_watcher, &QFileSystemWatcher::fileChanged, this, [this]() {
-            loadConfig();
-            if (QFile::exists(m_configPath))
-                m_watcher.addPath(m_configPath);
-            emit configChanged();
-        });
-    }
+    m_watcher.addPath(QFileInfo(m_configPath).absolutePath());
 }
 
 QStringList ConfigManager::availableThemes() const
@@ -683,8 +699,12 @@ void ConfigManager::saveSettings(const QVariantMap &settings)
         ofs.close();
     }
 
-    if (QFile::exists(m_configPath))
+    if (QFile::exists(m_configPath)) {
+        // Our own write, not an external edit — keep the stamp in sync so the
+        // watcher does not reload what we just saved.
+        m_configModified = QFileInfo(m_configPath).lastModified();
         m_watcher.addPath(m_configPath);
+    }
 
     emit configChanged();
 }
@@ -809,8 +829,12 @@ void ConfigManager::saveShortcuts(const QVariantMap &shortcuts)
         ofs.close();
     }
 
-    if (QFile::exists(m_configPath))
+    if (QFile::exists(m_configPath)) {
+        // Our own write, not an external edit — keep the stamp in sync so the
+        // watcher does not reload what we just saved.
+        m_configModified = QFileInfo(m_configPath).lastModified();
         m_watcher.addPath(m_configPath);
+    }
 
     emit configChanged();
 }
@@ -844,8 +868,12 @@ void ConfigManager::saveBookmarks(const QStringList &paths)
         ofs.close();
     }
 
-    if (QFile::exists(m_configPath))
+    if (QFile::exists(m_configPath)) {
+        // Our own write, not an external edit — keep the stamp in sync so the
+        // watcher does not reload what we just saved.
+        m_configModified = QFileInfo(m_configPath).lastModified();
         m_watcher.addPath(m_configPath);
+    }
 }
 
 void ConfigManager::saveSidebarWidth(int width)

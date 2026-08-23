@@ -782,6 +782,50 @@ private slots:
         // If watcher didn't fire (CI timing), skip rather than fail
     }
 
+    // Editors save by writing a temp file and renaming over the target, which
+    // replaces the inode. A file-only watch dies there — silently, and for the
+    // rest of the process's life. Two consecutive replacements must both land.
+    void testRenameSaveKeepsReloading()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.path() + "/config.toml";
+
+        auto replaceConfig = [&](const QString &theme) {
+            const QString tmp = path + ".tmp";
+            QFile f(tmp);
+            QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Truncate));
+            f.write(QStringLiteral("[general]\ntheme = \"%1\"\n").arg(theme).toUtf8());
+            f.close();
+            QFile::remove(path);
+            QVERIFY(QFile::rename(tmp, path));
+        };
+
+        replaceConfig("initial");
+        ConfigManager mgr(path);
+        QCOMPARE(mgr.theme(), QString("initial"));
+
+        QSignalSpy spy(&mgr, &ConfigManager::configChanged);
+
+        QTest::qWait(20);
+        replaceConfig("second");
+        QVERIFY(spy.wait(5000));
+        QCOMPARE(mgr.theme(), QString("second"));
+
+        QTest::qWait(20);
+        replaceConfig("third");
+        QVERIFY(spy.wait(5000));
+        QCOMPARE(mgr.theme(), QString("third"));
+
+        // The harsher variant: some editors unlink the file and only write the
+        // replacement a moment later. A file-only watch has nothing to re-arm
+        // on at that instant and stays dead; the directory watch catches it.
+        QVERIFY(QFile::remove(path));
+        QTest::qWait(50);
+        replaceConfig("fourth");
+        QVERIFY(spy.wait(5000));
+        QCOMPARE(mgr.theme(), QString("fourth"));
+    }
+
     // --- Empty config file ---
 
     void testEmptyConfigFile()

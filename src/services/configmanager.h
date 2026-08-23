@@ -5,6 +5,7 @@
 #include <QStringList>
 #include <QVariantList>
 #include <QVariantMap>
+#include <QDateTime>
 #include <QFileSystemWatcher>
 #include <QMap>
 
@@ -119,6 +120,7 @@ private:
     QString m_themesDir;
     QString m_defaultThemeName;
     QFileSystemWatcher m_watcher;
+    QDateTime m_configModified;
 
     QString m_theme;
     QString m_iconTheme;
