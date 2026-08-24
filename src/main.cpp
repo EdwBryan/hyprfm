@@ -52,6 +52,8 @@
 #include "providers/iconprovider.h"
 #include "providers/pdfpreviewprovider.h"
 #include <QIcon>
+#include <QEvent>
+#include <functional>
 #include <QUrl>
 
 namespace {
@@ -83,6 +85,43 @@ void printUsage()
         "Qt options such as -style are accepted and passed through.\n",
         HYPRFM_VERSION);
 }
+
+// The platform theme publishes its own UI font once the QPA plugin has
+// settled, which happens *after* the first window is created and silently
+// overwrites the font set at startup. Anything built before that keeps the
+// configured family while everything created later (view delegates, recycled
+// rows) gets the platform one, so the window ends up in two fonts. Re-apply
+// ours whenever the platform pushes a replacement.
+class UiFontGuard : public QObject
+{
+public:
+    UiFontGuard(QGuiApplication *app, std::function<QFont()> desiredFont)
+        : QObject(app)
+        , m_app(app)
+        , m_desiredFont(std::move(desiredFont))
+    {
+        m_app->installEventFilter(this);
+    }
+
+protected:
+    bool eventFilter(QObject *watched, QEvent *event) override
+    {
+        if (event->type() == QEvent::ApplicationFontChange && !m_applying) {
+            const QFont wanted = m_desiredFont();
+            if (m_app->font().family() != wanted.family()) {
+                m_applying = true;
+                m_app->setFont(wanted);
+                m_applying = false;
+            }
+        }
+        return QObject::eventFilter(watched, event);
+    }
+
+private:
+    QGuiApplication *m_app;
+    std::function<QFont()> m_desiredFont;
+    bool m_applying = false;
+};
 
 } // namespace
 
@@ -297,6 +336,7 @@ int main(int argc, char *argv[])
     ConfigManager *config = new ConfigManager(configPath, &app, themeDirs, systemDefaultTheme);
     mark("ConfigManager loaded");
     app.setFont(resolveUiFont(config->fontFamily()));
+    new UiFontGuard(&app, [&]() { return resolveUiFont(config->fontFamily()); });
     ThemeLoader *theme = new ThemeLoader(&app);
     theme->loadTheme(config->theme(), themeDirs);
     mark("ThemeLoader loaded");

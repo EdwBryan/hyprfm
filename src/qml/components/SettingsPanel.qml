@@ -489,6 +489,7 @@ Window {
                 Layout.fillWidth: true
                 label: "Font"
                 model: root.fontOptions
+                previewFont: true
                 currentIndex: root.optionIndex(root.fontOptions, root.draftFontFamily === "" ? root.systemFontLabel : root.draftFontFamily, 0)
                 onSelected: (_, value) => {
                     root.draftFontFamily = value === root.systemFontLabel ? "" : value
