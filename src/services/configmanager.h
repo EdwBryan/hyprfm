@@ -50,7 +50,7 @@ class ConfigManager : public QObject
 
 public:
     explicit ConfigManager(const QString &configPath, QObject *parent = nullptr,
-                           const QString &themesDir = QString(),
+                           const QStringList &themesDirs = QStringList(),
                            const QString &defaultTheme = QStringLiteral("catppuccin-mocha"));
 
     QStringList availableFonts() const;
@@ -117,7 +117,7 @@ private:
     QMap<QString, QVariantMap> m_folderSort;
 
     QString m_configPath;
-    QString m_themesDir;
+    QStringList m_themesDirs;
     QString m_defaultThemeName;
     QFileSystemWatcher m_watcher;
     QDateTime m_configModified;

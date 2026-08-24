@@ -42,7 +42,7 @@ private slots:
     void testCustomDefaultTheme()
     {
         QTemporaryDir dir;
-        ConfigManager mgr(dir.path() + "/config.toml", nullptr, QString(), "catppuccin-latte");
+        ConfigManager mgr(dir.path() + "/config.toml", nullptr, QStringList(), "catppuccin-latte");
 
         QCOMPARE(mgr.theme(), QString("catppuccin-latte"));
     }
@@ -62,7 +62,7 @@ private slots:
         lightTheme.write("[colors]\ntext = \"#111111\"\n");
         lightTheme.close();
 
-        ConfigManager mgr(dir.path() + "/config.toml", nullptr, dir.path() + "/themes");
+        ConfigManager mgr(dir.path() + "/config.toml", nullptr, QStringList{dir.path() + "/themes"});
         QCOMPARE(mgr.availableThemes(), QStringList({"dark", "light"}));
     }
 

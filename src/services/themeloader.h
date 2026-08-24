@@ -21,7 +21,7 @@ class ThemeLoader : public QObject
 
 public:
     explicit ThemeLoader(QObject *parent = nullptr);
-    void loadTheme(const QString &nameOrPath, const QString &themesDir);
+    void loadTheme(const QString &nameOrPath, const QStringList &themesDirs);
     QColor color(const QString &name) const;
     QColor base() const { return color("base"); }
     QColor mantle() const { return color("mantle"); }

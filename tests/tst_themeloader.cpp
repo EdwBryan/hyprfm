@@ -12,7 +12,7 @@ private slots:
     void testLoadBuiltinTheme()
     {
         ThemeLoader loader;
-        loader.loadTheme("catppuccin-mocha", THEMES_DIR);
+        loader.loadTheme("catppuccin-mocha", QStringList{QString(THEMES_DIR)});
         QCOMPARE(loader.color("base"), QColor("#1e1e2e"));
         QCOMPARE(loader.color("accent"), QColor("#89b4fa"));
         QCOMPARE(loader.color("text"), QColor("#cdd6f4"));
@@ -22,7 +22,7 @@ private slots:
     void testLoadBuiltinLightTheme()
     {
         ThemeLoader loader;
-        loader.loadTheme("catppuccin-latte", THEMES_DIR);
+        loader.loadTheme("catppuccin-latte", QStringList{QString(THEMES_DIR)});
         QCOMPARE(loader.color("base"), QColor("#eff1f5"));
         QCOMPARE(loader.color("accent"), QColor("#1e66f5"));
         QCOMPARE(loader.color("text"), QColor("#4c4f69"));
@@ -32,7 +32,7 @@ private slots:
     void testAllBuiltinColors()
     {
         ThemeLoader loader;
-        loader.loadTheme("catppuccin-mocha", THEMES_DIR);
+        loader.loadTheme("catppuccin-mocha", QStringList{QString(THEMES_DIR)});
 
         QCOMPARE(loader.color("base"), QColor("#1e1e2e"));
         QCOMPARE(loader.color("mantle"), QColor("#181825"));
@@ -58,7 +58,7 @@ private slots:
         f.close();
 
         ThemeLoader loader;
-        loader.loadTheme(path, "");
+        loader.loadTheme(path, QStringList{});
         QCOMPARE(loader.color("base"), QColor("#000000"));
         QCOMPARE(loader.color("text"), QColor("#ffffff"));
         QCOMPARE(loader.color("accent"), QColor("#ff0000"));
@@ -74,7 +74,7 @@ private slots:
         f.close();
 
         ThemeLoader loader;
-        loader.loadTheme(path, "");
+        loader.loadTheme(path, QStringList{});
         QCOMPARE(loader.color("base"), QColor("#000000"));
         // All other colors should fall back to defaults
         QCOMPARE(loader.color("text"), QColor("#cdd6f4"));
@@ -85,7 +85,7 @@ private slots:
     void testMissingThemeFile()
     {
         ThemeLoader loader;
-        loader.loadTheme("nonexistent-theme", "/nonexistent/path");
+        loader.loadTheme("nonexistent-theme", QStringList{"/nonexistent/path"});
         // Should fall back to defaults, not crash
         QCOMPARE(loader.color("base"), QColor("#1e1e2e"));
         QCOMPARE(loader.color("text"), QColor("#cdd6f4"));
@@ -101,7 +101,7 @@ private slots:
         f.close();
 
         ThemeLoader loader;
-        loader.loadTheme(path, "");
+        loader.loadTheme(path, QStringList{});
         // Should use defaults, not crash
         QCOMPARE(loader.color("base"), QColor("#1e1e2e"));
     }
@@ -109,7 +109,7 @@ private slots:
     void testUnknownColorNameReturnsFallback()
     {
         ThemeLoader loader;
-        loader.loadTheme("catppuccin-mocha", THEMES_DIR);
+        loader.loadTheme("catppuccin-mocha", QStringList{QString(THEMES_DIR)});
         // Unknown color name should return some default
         QColor unknown = loader.color("nonexistent_color");
         QVERIFY(unknown.isValid() || !unknown.isValid()); // Just verify no crash
@@ -120,14 +120,14 @@ private slots:
         ThemeLoader loader;
         QSignalSpy spy(&loader, &ThemeLoader::themeChanged);
 
-        loader.loadTheme("catppuccin-mocha", THEMES_DIR);
+        loader.loadTheme("catppuccin-mocha", QStringList{QString(THEMES_DIR)});
         QCOMPARE(spy.count(), 1);
     }
 
     void testLoadThemeByName()
     {
         ThemeLoader loader;
-        loader.loadTheme("catppuccin-mocha", THEMES_DIR);
+        loader.loadTheme("catppuccin-mocha", QStringList{QString(THEMES_DIR)});
         // Loaded by name from themes directory
         QCOMPARE(loader.color("base"), QColor("#1e1e2e"));
     }
@@ -135,7 +135,7 @@ private slots:
     void testPropertyAccessors()
     {
         ThemeLoader loader;
-        loader.loadTheme("catppuccin-mocha", THEMES_DIR);
+        loader.loadTheme("catppuccin-mocha", QStringList{QString(THEMES_DIR)});
 
         // Test the Q_PROPERTY accessors directly
         QCOMPARE(loader.base(), QColor("#1e1e2e"));
@@ -152,7 +152,7 @@ private slots:
         f.close(); // empty file
 
         ThemeLoader loader;
-        loader.loadTheme(path, "");
+        loader.loadTheme(path, QStringList{});
         // Should use all defaults
         QCOMPARE(loader.color("base"), QColor("#1e1e2e"));
     }
@@ -167,8 +167,36 @@ private slots:
         f.close();
 
         ThemeLoader loader;
-        loader.loadTheme(path, "");
+        loader.loadTheme(path, QStringList{});
         QCOMPARE(loader.color("base"), QColor("#1e1e2e"));
+    }
+
+    void testUserThemeDirIsSearchedAndShadowsBuiltins()
+    {
+        QTemporaryDir userDir;
+        const auto write = [&](const QString &name, const QString &base) {
+            QFile f(userDir.path() + "/" + name + ".toml");
+            f.open(QIODevice::WriteOnly);
+            f.write(QString("[colors]\nbase = \"%1\"\n").arg(base).toUtf8());
+            f.close();
+        };
+        write("monoknight", "#000000");
+        write("catppuccin-mocha", "#123456");
+
+        const QStringList dirs{userDir.path(), QString(THEMES_DIR)};
+
+        // A theme that only exists in the user directory is found.
+        ThemeLoader loader;
+        loader.loadTheme("monoknight", dirs);
+        QCOMPARE(loader.color("base"), QColor("#000000"));
+
+        // A user theme wins over the bundled one with the same name.
+        loader.loadTheme("catppuccin-mocha", dirs);
+        QCOMPARE(loader.color("base"), QColor("#123456"));
+
+        // Bundled themes still resolve through the later directory.
+        loader.loadTheme("catppuccin-latte", dirs);
+        QCOMPARE(loader.color("base"), QColor("#eff1f5"));
     }
 };
 

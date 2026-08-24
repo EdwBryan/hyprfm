@@ -157,11 +157,11 @@ QMap<QString, QString> ConfigManager::s_defaultShortcuts = {
     {"keyboard_shortcuts", "Ctrl+?"},
 };
 
-ConfigManager::ConfigManager(const QString &configPath, QObject *parent, const QString &themesDir,
+ConfigManager::ConfigManager(const QString &configPath, QObject *parent, const QStringList &themesDirs,
                              const QString &defaultTheme)
     : QObject(parent)
     , m_configPath(configPath)
-    , m_themesDir(themesDir)
+    , m_themesDirs(themesDirs)
     , m_defaultThemeName(defaultTheme)
 {
     setDefaults();
@@ -197,16 +197,20 @@ ConfigManager::ConfigManager(const QString &configPath, QObject *parent, const Q
 
 QStringList ConfigManager::availableThemes() const
 {
-    if (m_themesDir.isEmpty())
-        return {};
-
-    QDir dir(m_themesDir);
-    const QStringList files = dir.entryList({"*.toml"}, QDir::Files, QDir::Name | QDir::IgnoreCase);
-
     QStringList themes;
-    themes.reserve(files.size());
-    for (const QString &fileName : files)
-        themes.append(QFileInfo(fileName).completeBaseName());
+    for (const QString &themesDir : m_themesDirs) {
+        if (themesDir.isEmpty())
+            continue;
+        QDir dir(themesDir);
+        const QStringList files =
+            dir.entryList({"*.toml"}, QDir::Files, QDir::Name | QDir::IgnoreCase);
+        for (const QString &fileName : files) {
+            const QString name = QFileInfo(fileName).completeBaseName();
+            if (!themes.contains(name))
+                themes.append(name);
+        }
+    }
+    themes.sort(Qt::CaseInsensitive);
     return themes;
 }
 

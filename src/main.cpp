@@ -275,7 +275,15 @@ int main(int argc, char *argv[])
     if (!dataDir.isEmpty())
         themeSearchPaths.prepend(QDir(dataDir).filePath("themes"));
 
+    // User themes come first so ~/.config/hyprfm/themes can add to or override
+    // the bundled set.
+    QStringList themeDirs;
+    const QString userThemesDir = configDir + "/themes";
+    if (QDir(userThemesDir).exists())
+        themeDirs.append(QDir::cleanPath(userThemesDir));
     const QString themesDir = firstExistingDir(themeSearchPaths);
+    if (!themesDir.isEmpty())
+        themeDirs.append(themesDir);
     if (dataDir.isEmpty())
         qWarning() << "HyprFM: unable to locate data directory";
     if (themesDir.isEmpty())
@@ -286,11 +294,11 @@ int main(int argc, char *argv[])
         : QStringLiteral("catppuccin-mocha");
 
     // Create backend instances
-    ConfigManager *config = new ConfigManager(configPath, &app, themesDir, systemDefaultTheme);
+    ConfigManager *config = new ConfigManager(configPath, &app, themeDirs, systemDefaultTheme);
     mark("ConfigManager loaded");
     app.setFont(resolveUiFont(config->fontFamily()));
     ThemeLoader *theme = new ThemeLoader(&app);
-    theme->loadTheme(config->theme(), themesDir);
+    theme->loadTheme(config->theme(), themeDirs);
     mark("ThemeLoader loaded");
 
     TabListModel *tabModel = new TabListModel(&app);
@@ -390,7 +398,7 @@ int main(int argc, char *argv[])
 
     // Keep the live UI in sync with persisted config values.
     QObject::connect(config, &ConfigManager::configChanged, [=, &app, &resolveUiFont]() {
-        theme->loadTheme(config->theme(), themesDir);
+        theme->loadTheme(config->theme(), themeDirs);
         bookmarks->setBookmarks(config->bookmarks());
         fsModel->setShowHidden(config->showHidden());
         splitFsModel->setShowHidden(config->showHidden());

@@ -17,14 +17,23 @@ QMap<QString, QColor> ThemeLoader::s_defaults = {
 
 ThemeLoader::ThemeLoader(QObject *parent) : QObject(parent), m_colors(s_defaults) {}
 
-void ThemeLoader::loadTheme(const QString &nameOrPath, const QString &themesDir)
+void ThemeLoader::loadTheme(const QString &nameOrPath, const QStringList &themesDirs)
 {
     m_colors = s_defaults;
     QString filePath;
     if (QFile::exists(nameOrPath)) {
         filePath = nameOrPath;
-    } else if (!themesDir.isEmpty()) {
-        filePath = QDir(themesDir).filePath(nameOrPath + ".toml");
+    } else {
+        // First directory wins, so the user's ~/.config themes shadow bundled ones.
+        for (const QString &dir : themesDirs) {
+            if (dir.isEmpty())
+                continue;
+            const QString candidate = QDir(dir).filePath(nameOrPath + ".toml");
+            if (QFile::exists(candidate)) {
+                filePath = candidate;
+                break;
+            }
+        }
     }
     if (filePath.isEmpty() || !QFile::exists(filePath)) {
         qWarning() << "Theme not found:" << nameOrPath;
