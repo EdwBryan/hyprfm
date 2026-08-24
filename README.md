@@ -19,6 +19,13 @@ HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
 
 <div align="center">
 
+![HyprFM demo](docs/screenshots/demo.gif)
+*Miller columns with a live preview pane, then bulk rename with its preview list*
+
+</div>
+
+<div align="center">
+
 ![Grid view](docs/screenshots/grid-view.png)
 *Grid view with built-in icon set, themed sidebar, and live preview blur*
 
