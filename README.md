@@ -140,10 +140,14 @@ Tested on Ubuntu 24.04. May work on other recent Debian-based distributions.
 ### AppImage (any distro)
 
 ```bash
-wget https://github.com/soyeb-jim285/hyprfm/releases/latest/download/HyprFM-v0.4.20-x86_64.AppImage
+curl -LO "$(curl -fsSL https://api.github.com/repos/soyeb-jim285/hyprfm/releases/latest \
+    | grep -o 'https://[^"]*\.AppImage')"
 chmod +x HyprFM-*.AppImage
 ./HyprFM-*.AppImage
 ```
+
+The asset name carries the version, so grab the current one from the
+[releases page](https://github.com/soyeb-jim285/hyprfm/releases/latest) if you would rather not pipe through `curl`.
 
 The AppImage is fully self-contained — no system Qt installation required.
 
@@ -160,6 +164,16 @@ cmake --build build --parallel
 ```
 
 > **Note:** the `--recursive` flag is important — HyprFM uses Git submodules for the [Quill](https://github.com/soyeb-jim285/quill) component library and the [quill-icons](https://github.com/soyeb-jim285/quill-icons) icon set.
+
+#### AppImage from source
+
+To build a self-contained AppImage from the current checkout — useful for testing a fix that is on `main` but not yet released:
+
+```bash
+./scripts/build-appimage-local.sh
+```
+
+The result lands in the repo root as `HyprFM-<version>-x86_64.AppImage`. The script downloads `linuxdeploy` into `appimage-tools/` on first run, bundles Qt, and runs an offscreen smoke test before finishing. It needs `curl` or `wget` on top of the build dependencies below.
 
 #### Dependencies
 
