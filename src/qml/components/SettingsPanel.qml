@@ -1010,8 +1010,11 @@ Window {
         id: pageContainer
         anchors.fill: parent
 
-        property real pageContentHeight: pageLoader.item ? pageLoader.item.implicitHeight : 0
-        implicitHeight: Math.max(460, Math.min(pageContentHeight + 120, 640,
+        // One height for every section. Hyprland keeps a floating window at
+        // the size it mapped with, so shrinking for a shorter section left a
+        // stale band of the previous page below the content (issue #12).
+        // Sections taller than this scroll inside contentFlick.
+        implicitHeight: Math.max(460, Math.min(640,
             (root.transientParent ? root.transientParent.height : 768) - 140))
 
         Rectangle {
