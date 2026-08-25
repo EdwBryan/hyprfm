@@ -1840,6 +1840,30 @@ void FileOperations::openInTerminal(const QString &dirPath)
             proc, &QProcess::deleteLater);
 }
 
+// [[context_menu.actions]] from config.toml. The command uses desktop-entry
+// field codes (%f/%u...), and runs once per selected path so a plain
+// "convert %f out.png" works on a multi-selection without shell quoting.
+void FileOperations::runCustomAction(const QString &command, const QStringList &paths)
+{
+    for (const QString &path : paths) {
+        const QString normalized = normalizeLocation(path);
+        const QStringList argv = desktopExecArguments(command, normalized);
+        if (argv.isEmpty()) {
+            emit operationFinished(false, QStringLiteral("Custom action has no command"));
+            return;
+        }
+        QProcess proc;
+        proc.setProgram(argv.first());
+        proc.setArguments(argv.mid(1));
+        proc.setWorkingDirectory(QFileInfo(normalized).absolutePath());
+        if (!proc.startDetached()) {
+            emit operationFinished(false,
+                QStringLiteral("Could not run '%1' — is it installed?").arg(argv.first()));
+            return;
+        }
+    }
+}
+
 // Launch a second, independent HyprFM window. `--new-window` makes the child
 // skip the single-instance handoff (and the shared session file), so the two
 // windows coexist instead of the new process forwarding to this one.

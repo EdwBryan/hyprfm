@@ -155,6 +155,24 @@ private slots:
         QVERIFY2(spy.isEmpty(), "launch reported a failure");
     }
 
+    void testRunCustomActionSubstitutesPathAndRunsPerItem()
+    {
+        QTemporaryDir dir;
+        const QString script = dir.filePath("act.sh");
+        {
+            QFile f(script);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("#!/bin/sh\ntouch \"$1.done\"\n");
+        }
+        QFile::setPermissions(script, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+        const QString a = dir.filePath("a.txt"), b = dir.filePath("b.txt");
+
+        FileOperations ops;
+        ops.runCustomAction(script + " %f", {a, b});
+        QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(a + ".done"), 5000);
+        QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(b + ".done"), 5000);
+    }
+
     // --- Copy ---
 
     void testCopyFile()

@@ -112,6 +112,32 @@ Item {
     property bool _submenuOpensRight: true
     property real _submenuPointerCenterY: 24
 
+    // [[context_menu.actions]] entries whose `types` match the target:
+    // "*" (anything), "dir", an extension ("png"), or a MIME pattern
+    // ("image/*", "text/plain"). Unset types = everything.
+    function customActionItems(mime) {
+        var actions = config.customContextActions || []
+        var ext = targetIsDir ? "" : targetPath.split("/").pop().split(".").pop().toLowerCase()
+        var items = []
+        for (var i = 0; i < actions.length; ++i) {
+            var a = actions[i]
+            if (!a.name || !a.command) continue
+            var types = a.types || ["*"]
+            var match = types.length === 0
+            for (var t = 0; t < types.length && !match; ++t) {
+                var type = String(types[t]).toLowerCase()
+                if (type === "*") match = true
+                else if (type === "dir") match = targetIsDir
+                else if (type.indexOf("/") >= 0)
+                    match = !targetIsDir && (type.endsWith("/*") ? mime.startsWith(type.slice(0, -1)) : mime === type)
+                else match = !targetIsDir && ext === type.replace(/^\./, "")
+            }
+            if (match)
+                items.push({ text: a.name, shortcut: "", action: "custom:" + i, icon: "Terminal" })
+        }
+        return items
+    }
+
     function submenuKeyForItem(item) {
         return item ? (item.action || item.text || "") : ""
     }
@@ -615,9 +641,10 @@ Item {
             } else if (splitViewEnabled) {
                 items.push({ text: "Close Split View", shortcut: "", action: "close_split", icon: "SquareSplitHorizontal" })
             }
+            var mime = ""
             if (!targetIsDir && fileModel) {
                 var props = fileModel.fileProperties(targetPath)
-                var mime = props["mimeType"] || ""
+                mime = props["mimeType"] || ""
                 if (mime !== "") {
                     var apps = fileModel.availableApps(mime)
                     if (apps.length > 0)
@@ -628,6 +655,13 @@ Item {
             }
             if (targetIsDir && !isTrashView && !remoteContext)
                 items.push({ text: "Open in Terminal", shortcut: "", action: "terminal", icon: "Terminal" })
+            if (!isTrashView && !remoteContext) {
+                var custom = customActionItems(typeof mime === "string" ? mime : "")
+                if (custom.length > 0) {
+                    items.push({ separator: true })
+                    items = items.concat(custom)
+                }
+            }
             items.push({ separator: true })
             if (isTrashView) {
                 items.push({ text: "Restore", shortcut: "", action: "restore", icon: "Undo" })
@@ -765,7 +799,15 @@ Item {
         case "extract": fileOps.extractArchive(targetPath, effectiveDir); break
         case "setwallpaper": fileOps.setWallpaper(targetPath); break
         case "emptytrash": emptyTrashRequested(); break
-        default: customActionRequested(action); break
+        default:
+            if (action.startsWith("custom:")) {
+                var custom = config.customContextActions[parseInt(action.slice(7))]
+                if (custom && custom.command)
+                    fileOps.runCustomAction(custom.command, effectivePaths)
+            } else {
+                customActionRequested(action)
+            }
+            break
         }
     }
 

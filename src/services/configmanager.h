@@ -50,6 +50,7 @@ class ConfigManager : public QObject
     Q_PROPERTY(QString windowButtonLayout READ windowButtonLayout NOTIFY configChanged)
     Q_PROPERTY(QString configPath READ configPath CONSTANT)
     Q_PROPERTY(QVariantMap shortcutMap READ shortcutMap NOTIFY configChanged)
+    Q_PROPERTY(QVariantList customContextActions READ customContextActions NOTIFY configChanged)
     Q_PROPERTY(QVariantList shortcutDefinitions READ shortcutDefinitions NOTIFY configChanged)
 
 public:

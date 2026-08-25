@@ -609,6 +609,21 @@ current_fraction = 0.5
 # and choose "Rename" to set one in-app.
 # names = { "~/Projects" = "Work" }
 
+[context_menu]
+# Extra entries at the bottom of a file's or folder's right-click menu.
+# `command` takes desktop-entry field codes (%f or %u = the item's path) and runs once
+# per selected item, from that item's folder. `types` limits where the entry
+# shows: "*" (default), "dir", an extension ("png"), or a MIME pattern
+# ("image/*", "text/plain").
+# [[context_menu.actions]]
+# name = "Optimize PNG"
+# command = "oxipng -o 4 %f"
+# types = ["png"]
+# [[context_menu.actions]]
+# name = "Open in VS Code"
+# command = "code %f"
+# types = ["dir", "text/*"]
+
 [shortcuts]
 # Override any shortcut with a Qt key sequence. Defaults:
 # open              = "Return"
