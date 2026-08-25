@@ -270,15 +270,19 @@ void DependencyChecker::populate()
         buildHints(QStringLiteral("ntfs-3g"))
     });
 
+    // Required: the trash view is a trash:// URI, which only gvfsd-trash
+    // serves (issue #10). trash.mount is where every distro registers it;
+    // the lib dirs cover layouts without /usr/share/gvfs.
     const bool gvfsAvailable = hasExecutable(QStringLiteral("gio")) && hasAnyFile({
+        QStringLiteral("/usr/share/gvfs/mounts/trash.mount"),
         QStringLiteral("/usr/lib/gvfs"),
         QStringLiteral("/usr/lib64/gvfs"),
     });
     m_deps.append({
         QStringLiteral("gvfs"),
         QStringLiteral("GVFS backends"),
-        QStringLiteral("Connect to remote file systems (SFTP, SMB, WebDAV)."),
-        Kind::Tool, false, gvfsAvailable,
+        QStringLiteral("Browse the trash and connect to remote file systems (SFTP, SMB, WebDAV)."),
+        Kind::Tool, true, gvfsAvailable,
         {QStringLiteral("gio")},
         buildHints(QStringLiteral("gvfs"))
     });

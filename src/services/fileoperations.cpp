@@ -70,6 +70,18 @@ bool isTrashUriPath(const QString &path)
     return QUrl(path).scheme() == "trash";
 }
 
+// Every trash:// operation goes through gvfsd-trash. Without gvfs installed
+// GLib has no backend for the scheme at all and answers a bare "Operation not
+// supported" (issue #10) — say what is actually missing.
+QString trashErrorMessage(GError *err, const QString &fallback)
+{
+    if (!err)
+        return fallback;
+    if (err->domain == G_IO_ERROR && err->code == G_IO_ERROR_NOT_SUPPORTED)
+        return QStringLiteral("Browsing the trash needs gvfs installed (gvfsd-trash)");
+    return QString::fromUtf8(err->message);
+}
+
 bool isUriPath(const QString &path)
 {
     const QUrl url(path);
@@ -1130,7 +1142,8 @@ void FileOperations::restoreFromTrash(const QStringList &paths)
                     G_FILE_QUERY_INFO_NONE, nullptr, &gErr);
 
                 if (!info) {
-                    if (gErr) { lastError = QString::fromUtf8(gErr->message); g_error_free(gErr); }
+                    lastError = trashErrorMessage(gErr, QStringLiteral("Could not read trash entry"));
+                    if (gErr) g_error_free(gErr);
                     g_object_unref(trashFile);
                     continue;
                 }
@@ -1612,10 +1625,10 @@ void FileOperations::emptyTrash()
                 g_file_enumerator_close(counter, nullptr, nullptr);
                 g_object_unref(counter);
             } else {
-                QString err;
-                if (enumErr) { err = QString::fromUtf8(enumErr->message); g_error_free(enumErr); }
+                const QString err = trashErrorMessage(enumErr, QStringLiteral("Could not enumerate trash"));
+                if (enumErr) g_error_free(enumErr);
                 g_object_unref(trash);
-                return err.isEmpty() ? QStringLiteral("Could not enumerate trash") : err;
+                return err;
             }
 
             // Second pass: delete with progress
