@@ -684,6 +684,7 @@ GridView {
             visible: false
             width: labelText.width
             font: labelText.font
+            textFormat: Text.PlainText
             text: delegateItem.fileName
             wrapMode: Text.WrapAnywhere
             maximumLineCount: 3
@@ -695,6 +696,7 @@ GridView {
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: (iconImg.visible ? iconImg : thumbImg).bottom
             anchors.topMargin: 0
+            textFormat: Text.PlainText
             text: {
                 var name = delegateItem.fileName
                 // If it fits in 2 lines, show as-is

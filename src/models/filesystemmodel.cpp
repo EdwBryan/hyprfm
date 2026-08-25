@@ -13,7 +13,9 @@
 #include <QTimer>
 #include <QDirIterator>
 #include <QUrl>
+#include "services/diskusageservice.h"
 #include <QtConcurrent>
+#include <QCollator>
 #include <algorithm>
 
 // Forward declarations for helpers defined further down (used by methods
@@ -249,19 +251,7 @@ int accessIndexFromMode(int mode, int readMask, int writeMask, int execMask)
 
 QString formattedSize(qint64 size, bool verbose = false)
 {
-    if (size < 0)
-        return {};
-    if (size < 1024)
-        return verbose ? QString("%1 B (%2 bytes)").arg(size).arg(QLocale().toString(size))
-                       : QString("%1 B").arg(size);
-    if (size < 1024 * 1024)
-        return verbose ? QString("%1 KB (%2 bytes)").arg(size / 1024.0, 0, 'f', 1).arg(QLocale().toString(size))
-                       : QString("%1 KB").arg(size / 1024.0, 0, 'f', 1);
-    if (size < 1024LL * 1024 * 1024)
-        return verbose ? QString("%1 MB (%2 bytes)").arg(size / (1024.0 * 1024.0), 0, 'f', 1).arg(QLocale().toString(size))
-                       : QString("%1 MB").arg(size / (1024.0 * 1024.0), 0, 'f', 1);
-    return verbose ? QString("%1 GB (%2 bytes)").arg(size / (1024.0 * 1024.0 * 1024.0), 0, 'f', 2).arg(QLocale().toString(size))
-                   : QString("%1 GB").arg(size / (1024.0 * 1024.0 * 1024.0), 0, 'f', 1);
+    return DiskUsageService::formattedSize(size, verbose);
 }
 
 // Resolve a MIME type name (e.g. "text/x-typescript", "video/mp2t") to a
@@ -574,10 +564,15 @@ QVariantMap buildTrashProperties(const QVariantMap &entry)
 FileSystemModel::FileSystemModel(QObject *parent)
     : QAbstractListModel(parent)
 {
+    // inotify delivers one event per file; an unpack of thousands of files
+    // would otherwise queue thousands of full rescans.
+    m_refreshDebounce.setSingleShot(true);
+    m_refreshDebounce.setInterval(150);
+    connect(&m_refreshDebounce, &QTimer::timeout, this, &FileSystemModel::refresh);
     connect(&m_watcher, &QFileSystemWatcher::directoryChanged, this, [this]() {
         if (!m_rootPath.isEmpty())
             emit watchedDirectoryChanged(m_rootPath);
-        refresh();
+        m_refreshDebounce.start();
     });
 }
 
@@ -978,6 +973,29 @@ void FileSystemModel::reloadLocal()
     scheduleLocalReload(/*tryDiff=*/false);
 }
 
+// QDir::Name orders by code point ("file10" before "file2", "Ä" after "z").
+// Re-sort name/type listings with a numeric, locale-aware collator; size and
+// time orders are left to QDir.
+static void applyNaturalNameOrder(QFileInfoList &infos, QDir::SortFlags flags)
+{
+    if ((flags & QDir::SortByMask) != QDir::Name)
+        return;
+    QCollator collator;
+    collator.setNumericMode(true);
+    collator.setCaseSensitivity(Qt::CaseInsensitive);
+    const bool dirsFirst = flags & QDir::DirsFirst;
+    const bool byType = flags & QDir::Type;
+    const bool reversed = flags & QDir::Reversed;
+    std::stable_sort(infos.begin(), infos.end(), [&](const QFileInfo &a, const QFileInfo &b) {
+        if (dirsFirst && a.isDir() != b.isDir())
+            return a.isDir();
+        int c = byType ? collator.compare(a.suffix(), b.suffix()) : 0;
+        if (c == 0)
+            c = collator.compare(a.fileName(), b.fileName());
+        return reversed ? c > 0 : c < 0;
+    });
+}
+
 FileSystemModel::LocalReloadResult FileSystemModel::scanLocalEntries(
     quint64 generation, const QString &rootPath, bool showHidden,
     QDir::SortFlags sortFlags)
@@ -992,7 +1010,8 @@ FileSystemModel::LocalReloadResult FileSystemModel::scanLocalEntries(
     if (showHidden)
         filters |= QDir::Hidden;
 
-    const QFileInfoList infos = dir.entryInfoList(filters, sortFlags);
+    QFileInfoList infos = dir.entryInfoList(filters, sortFlags);
+    applyNaturalNameOrder(infos, sortFlags);
     result.entries.reserve(infos.size());
     for (const QFileInfo &info : infos) {
         Entry e;
@@ -1163,7 +1182,10 @@ void FileSystemModel::applyRemoteReload(const QString &rootPath, const QByteArra
         }
     }
 
-    std::sort(entries.begin(), entries.end(), [this](const QVariantMap &lhs, const QVariantMap &rhs) {
+    QCollator collator;
+    collator.setNumericMode(true);                  // file2 before file10
+    collator.setCaseSensitivity(Qt::CaseInsensitive);
+    std::sort(entries.begin(), entries.end(), [this, &collator](const QVariantMap &lhs, const QVariantMap &rhs) {
         const bool lhsDir = lhs.value(QStringLiteral("isDir")).toBool();
         const bool rhsDir = rhs.value(QStringLiteral("isDir")).toBool();
         if (lhsDir != rhsDir)
@@ -1179,13 +1201,11 @@ void FileSystemModel::applyRemoteReload(const QString &rootPath, const QByteArra
             const QDateTime rightModified = rhs.value(QStringLiteral("fileModified")).toDateTime();
             comparison = (leftModified < rightModified) ? -1 : (leftModified > rightModified ? 1 : 0);
         } else if (m_sortColumn == QStringLiteral("type")) {
-            comparison = QString::compare(lhs.value(QStringLiteral("fileType")).toString(),
-                                          rhs.value(QStringLiteral("fileType")).toString(),
-                                          Qt::CaseInsensitive);
+            comparison = collator.compare(lhs.value(QStringLiteral("fileType")).toString(),
+                                          rhs.value(QStringLiteral("fileType")).toString());
         } else {
-            comparison = QString::compare(lhs.value(QStringLiteral("fileName")).toString(),
-                                          rhs.value(QStringLiteral("fileName")).toString(),
-                                          Qt::CaseInsensitive);
+            comparison = collator.compare(lhs.value(QStringLiteral("fileName")).toString(),
+                                          rhs.value(QStringLiteral("fileName")).toString());
         }
 
         return m_sortAscending ? comparison < 0 : comparison > 0;
@@ -1221,7 +1241,8 @@ QList<FileSystemModel::Entry> FileSystemModel::currentLocalEntries() const
     // Fast path: only the syscall + QFileInfo construction. Derived fields
     // (icon name, mime-backed type, locale-formatted date, permission text)
     // populate lazily on first data() request for each row.
-    const QFileInfoList infos = dir.entryInfoList(filters, m_sortFlags);
+    QFileInfoList infos = dir.entryInfoList(filters, m_sortFlags);
+    applyNaturalNameOrder(infos, m_sortFlags);
     QList<Entry> entries;
     entries.reserve(infos.size());
     for (const QFileInfo &info : infos) {
@@ -1378,7 +1399,10 @@ void FileSystemModel::reloadTrash()
             m_trashEntries.append(entry);
     }
 
-    std::sort(m_trashEntries.begin(), m_trashEntries.end(), [this](const QVariantMap &lhs, const QVariantMap &rhs) {
+    QCollator collator;
+    collator.setNumericMode(true);
+    collator.setCaseSensitivity(Qt::CaseInsensitive);
+    std::sort(m_trashEntries.begin(), m_trashEntries.end(), [this, &collator](const QVariantMap &lhs, const QVariantMap &rhs) {
         const bool lhsDir = lhs.value("isDir").toBool();
         const bool rhsDir = rhs.value("isDir").toBool();
         if (lhsDir != rhsDir)
@@ -1394,9 +1418,9 @@ void FileSystemModel::reloadTrash()
             const QDateTime rightModified = rhs.value("fileModified").toDateTime();
             comparison = (leftModified < rightModified) ? -1 : (leftModified > rightModified ? 1 : 0);
         } else if (m_sortColumn == "type") {
-            comparison = QString::compare(lhs.value("fileType").toString(), rhs.value("fileType").toString(), Qt::CaseInsensitive);
+            comparison = collator.compare(lhs.value("fileType").toString(), rhs.value("fileType").toString());
         } else {
-            comparison = QString::compare(lhs.value("fileName").toString(), rhs.value("fileName").toString(), Qt::CaseInsensitive);
+            comparison = collator.compare(lhs.value("fileName").toString(), rhs.value("fileName").toString());
         }
 
         return m_sortAscending ? comparison < 0 : comparison > 0;

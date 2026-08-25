@@ -30,6 +30,9 @@ bool gitStatusHostToolAvailable(const QString &program)
 void startGitTool(QProcess *process, const QStringList &arguments)
 {
     QStringList safeArguments {
+        // Never take .git/index.lock: we get SIGKILLed on app exit and a
+        // half-written refresh would leave the lock behind for the user.
+        QStringLiteral("--no-optional-locks"),
         QStringLiteral("-c"), QStringLiteral("core.fsmonitor=false"),
         QStringLiteral("-c"), QStringLiteral("core.hooksPath=/dev/null")
     };
@@ -117,16 +120,20 @@ void GitStatusService::stopProcesses()
 {
     if (m_repoProcess) {
         m_repoProcess->disconnect();
-        if (m_repoProcess->state() != QProcess::NotRunning)
+        if (m_repoProcess->state() != QProcess::NotRunning) {
             m_repoProcess->kill();
+            m_repoProcess->waitForFinished(200);
+        }
         m_repoProcess->deleteLater();
         m_repoProcess = nullptr;
     }
 
     if (m_gitProcess) {
         m_gitProcess->disconnect();
-        if (m_gitProcess->state() != QProcess::NotRunning)
+        if (m_gitProcess->state() != QProcess::NotRunning) {
             m_gitProcess->kill();
+            m_gitProcess->waitForFinished(200);
+        }
         m_gitProcess->deleteLater();
         m_gitProcess = nullptr;
     }

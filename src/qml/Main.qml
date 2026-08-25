@@ -1859,6 +1859,7 @@ ApplicationWindow {
                         }
 
                         Text {
+                            textFormat: Text.PlainText
                             text: modelData.name
                             color: Theme.text
                             font.pointSize: Theme.fontNormal
@@ -2085,6 +2086,7 @@ ApplicationWindow {
                         anchors.right: parent.right; anchors.rightMargin: 24
                         anchors.verticalCenter: parent.verticalCenter; spacing: 2
                         Text {
+                            textFormat: Text.PlainText
                             text: propertiesDialog.props.name || ""; color: Theme.text
                             font.pixelSize: 15; font.weight: Font.DemiBold
                             elide: Text.ElideMiddle; width: parent.width
@@ -2284,6 +2286,7 @@ ApplicationWindow {
                                 }
 
                                 Text {
+                                    textFormat: Text.PlainText
                                     text: modelData.name
                                     color: modelData.isDefault ? Theme.accent : Theme.text
                                     font.pointSize: Theme.fontSmall
@@ -2574,6 +2577,7 @@ ApplicationWindow {
 
         Text {
             Layout.fillWidth: true
+            textFormat: Text.PlainText
             text: root.deleteConfirmPaths.length === 1
                 ? "\"" + root.deleteConfirmPaths[0].substring(root.deleteConfirmPaths[0].lastIndexOf("/") + 1) + "\" will be permanently deleted. This cannot be undone."
                 : root.deleteConfirmPaths.length + " items will be permanently deleted. This cannot be undone."

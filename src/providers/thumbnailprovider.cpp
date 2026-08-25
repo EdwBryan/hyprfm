@@ -53,10 +53,26 @@ static QByteArray readTrashUriData(const QString &uri)
     } else {
         proc.start(QStringLiteral("gio"), {QStringLiteral("cat"), uriArg});
     }
-    if (!proc.waitForFinished(10000) || proc.exitCode() != 0)
+    // ponytail: 64 MB cap, same loop as PreviewService::readBoundedOutput;
+    // share it if a third copy ever appears.
+    constexpr qint64 kMaxBytes = 64 * 1024 * 1024;
+    if (!proc.waitForStarted(2000))
         return {};
-
-    return proc.readAllStandardOutput();
+    QByteArray data;
+    while (proc.state() != QProcess::NotRunning) {
+        if (!proc.waitForReadyRead(100))
+            proc.waitForFinished(100);
+        data += proc.readAllStandardOutput();
+        if (data.size() > kMaxBytes) {
+            proc.kill();
+            proc.waitForFinished(1000);
+            return {};
+        }
+    }
+    data += proc.readAllStandardOutput();
+    if (proc.exitStatus() != QProcess::NormalExit || proc.exitCode() != 0)
+        return {};
+    return data;
 }
 
 static QMimeType mimeForLocation(const QString &path)

@@ -789,6 +789,7 @@ FocusScope {
                             Text {
                                 width: root.colName - 20
                                 anchors.verticalCenter: parent.verticalCenter
+                                textFormat: Text.PlainText
                                 text: detRow.fileName
                                 color: Theme.text
                                 font.pointSize: Theme.fontSmall

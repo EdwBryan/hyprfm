@@ -2,6 +2,7 @@
 
 #include <QAbstractListModel>
 #include <QFileSystemWatcher>
+#include <QTimer>
 #include <QFileInfo>
 #include <QFutureWatcher>
 #include <QDir>
@@ -154,6 +155,7 @@ private:
     bool m_localReloadTryDiff = false;
     bool m_synchronousReload = false;
     QFileSystemWatcher m_watcher;
+    QTimer m_refreshDebounce;
     QDir::SortFlags m_sortFlags = QDir::Name | QDir::DirsFirst | QDir::IgnoreCase;
     QString m_sortColumn = "name";
     bool m_sortAscending = true;

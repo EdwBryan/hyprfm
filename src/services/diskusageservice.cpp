@@ -338,32 +338,6 @@ QString DiskUsageService::normalizePath(const QString &path)
     return QDir::cleanPath(localPath);
 }
 
-QString DiskUsageService::formattedSize(qint64 size, bool verbose)
-{
-    if (size < 0)
-        return {};
-    if (size < 1024) {
-        return verbose ? QStringLiteral("%1 B (%2 bytes)").arg(size).arg(QLocale().toString(size))
-                       : QStringLiteral("%1 B").arg(size);
-    }
-    if (size < 1024 * 1024) {
-        return verbose ? QStringLiteral("%1 KB (%2 bytes)")
-                               .arg(size / 1024.0, 0, 'f', 1)
-                               .arg(QLocale().toString(size))
-                       : QStringLiteral("%1 KB").arg(size / 1024.0, 0, 'f', 1);
-    }
-    if (size < 1024LL * 1024 * 1024) {
-        return verbose ? QStringLiteral("%1 MB (%2 bytes)")
-                               .arg(size / (1024.0 * 1024.0), 0, 'f', 1)
-                               .arg(QLocale().toString(size))
-                       : QStringLiteral("%1 MB").arg(size / (1024.0 * 1024.0), 0, 'f', 1);
-    }
-    return verbose ? QStringLiteral("%1 GB (%2 bytes)")
-                           .arg(size / (1024.0 * 1024.0 * 1024.0), 0, 'f', 2)
-                           .arg(QLocale().toString(size))
-                   : QStringLiteral("%1 GB").arg(size / (1024.0 * 1024.0 * 1024.0), 0, 'f', 1);
-}
-
 void DiskUsageService::cleanupRequest(int requestId)
 {
     m_requests.remove(requestId);

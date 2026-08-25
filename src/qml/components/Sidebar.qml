@@ -172,6 +172,7 @@ Rectangle {
                         }
 
                         Text {
+                            textFormat: Text.PlainText
                             text: model.name
                             color: quickAccessDelegate.isActive ? Theme.accent : Theme.text
                             font.pointSize: Theme.fontNormal
@@ -368,6 +369,7 @@ Rectangle {
                             }
 
                             Text {
+                                textFormat: Text.PlainText
                                 text: model.name
                                 color: bmDelegate.isActive ? Theme.accent : Theme.text
                                 font.pointSize: Theme.fontNormal

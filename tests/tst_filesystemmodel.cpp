@@ -1,5 +1,6 @@
 #include <QTest>
 #include <QSignalSpy>
+#include <QLocale>
 #include <QStandardPaths>
 #include <QAbstractItemModelTester>
 #include <QDir>
@@ -65,6 +66,44 @@ private slots:
         QVERIFY(!QFileInfo::exists(markerPath));
     }
 
+    void testGitStatusNeverRewritesTheIndex()
+    {
+        if (QStandardPaths::findExecutable("git").isEmpty())
+            QSKIP("git not found in PATH");
+
+        TestDir repo;
+        repo.createFile("tracked.txt", "v1");
+        QProcess git;
+        git.setWorkingDirectory(repo.path());
+        for (const QStringList &args : {QStringList{"init", "-q"},
+                                        QStringList{"-c", "user.name=t", "-c", "user.email=t@t", "add", "."},
+                                        QStringList{"-c", "user.name=t", "-c", "user.email=t@t", "commit", "-q", "-m", "x"}}) {
+            git.start("git", args);
+            QVERIFY(git.waitForFinished(5000));
+            QCOMPARE(git.exitCode(), 0);
+        }
+        // Make the cached stat data stale so a plain `git status` would take
+        // .git/index.lock and rewrite the index. A SIGKILL mid-write (app
+        // exit) would leave the lock behind; --no-optional-locks avoids it.
+        const QDateTime old = QDateTime::currentDateTime().addDays(-1);
+        QFile tracked(repo.path() + "/tracked.txt");
+        QVERIFY(tracked.open(QIODevice::ReadWrite));
+        QVERIFY(tracked.setFileTime(old, QFileDevice::FileModificationTime));
+        tracked.close();
+        QFile index(repo.path() + "/.git/index");
+        QVERIFY(index.open(QIODevice::ReadWrite));
+        QVERIFY(index.setFileTime(old, QFileDevice::FileModificationTime));
+        index.close();
+
+        GitStatusService service;
+        QSignalSpy statusSpy(&service, &GitStatusService::statusChanged);
+        service.setRootPath(repo.path());
+        QVERIFY(statusSpy.wait(5000));
+
+        QCOMPARE(QFileInfo(repo.path() + "/.git/index").lastModified().toSecsSinceEpoch(),
+                 old.toSecsSinceEpoch());
+    }
+
     // 2. homePath()
     void testHomePath()
     {
@@ -97,6 +136,24 @@ private slots:
     }
 
     // 4. setRootPath same path emits no signal
+    void testWatcherBurstCoalescesIntoOneRefresh()
+    {
+        TestDir dir;
+        FileSystemModel model;
+        model.setSynchronousReload(true);
+        model.setRootPath(dir.path());
+        QSignalSpy reloadSpy(&model, &FileSystemModel::countsChanged);
+
+        for (int i = 0; i < 20; ++i) {
+            dir.createFile(QString("f%1.txt").arg(i));
+            QCoreApplication::processEvents();
+        }
+        QTest::qWait(600);
+
+        QCOMPARE(model.rowCount(), 20);
+        QVERIFY2(reloadSpy.count() <= 2, qPrintable(QString("%1 reloads").arg(reloadSpy.count())));
+    }
+
     void testSetRootPathSamePath()
     {
         TestDir dir;
@@ -274,6 +331,37 @@ private slots:
 
         QModelIndex idx = model.index(0);
         QCOMPARE(model.data(idx, FileSystemModel::FilePathRole).toString(), fullPath);
+    }
+
+    void testSortByNameIsNaturalOrder()
+    {
+        TestDir dir;
+        dir.createFiles({"file10.txt", "file2.txt", "File1.txt"});
+
+        FileSystemModel model;
+        model.setSynchronousReload(true);
+        model.setRootPath(dir.path());
+        model.sortByColumn("name", true);
+
+        QStringList names;
+        for (int i = 0; i < model.rowCount(); ++i)
+            names << model.data(model.index(i), FileSystemModel::FileNameRole).toString();
+        QCOMPARE(names, QStringList({"File1.txt", "file2.txt", "file10.txt"}));
+    }
+
+    void testSizeTextUsesLocaleDecimalSeparator()
+    {
+        TestDir dir;
+        dir.createFile("data.bin", QByteArray(1536, 'x'));
+
+        QLocale::setDefault(QLocale(QLocale::German, QLocale::Germany));
+        FileSystemModel model;
+        model.setSynchronousReload(true);
+        model.setRootPath(dir.path());
+        const QString text = model.data(model.index(0), FileSystemModel::FileSizeTextRole).toString();
+        QLocale::setDefault(QLocale::c());
+
+        QCOMPARE(text, QString("1,5 KB"));
     }
 
     void testRoleDataFileSizeForFile()

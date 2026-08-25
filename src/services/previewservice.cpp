@@ -240,7 +240,28 @@ QString PreviewService::ansiToHtml(const QByteArray &ansiText)
 
 namespace {
 
-QByteArray batPreview(const QString &path, int maxLines, QString *error)
+// Collects stdout until the process exits or readLimit bytes arrive, then
+// kills it. Keeps `gio cat` of a multi-GB file from buffering it all.
+QByteArray readBoundedOutput(QProcess &proc, qint64 readLimit)
+{
+    QByteArray data;
+    while (proc.state() != QProcess::NotRunning) {
+        if (!proc.waitForReadyRead(100))
+            proc.waitForFinished(100);
+        data += proc.readAllStandardOutput();
+        if (data.size() >= readLimit) {
+            proc.kill();
+            proc.waitForFinished(1000);
+            break;
+        }
+    }
+    data += proc.readAllStandardOutput();
+    return data;
+}
+
+// bat highlights `data` (already capped by the caller) rather than the file
+// itself: one 300 MB line would otherwise come back as 300 MB of HTML.
+QByteArray batPreview(const QString &path, const QByteArray &data, int maxLines, QString *error)
 {
     if (error)
         error->clear();
@@ -257,11 +278,13 @@ QByteArray batPreview(const QString &path, int maxLines, QString *error)
     };
     if (maxLines > 0)
         args.append(QStringLiteral("--line-range=:%1").arg(maxLines));
-    args.append(QStringLiteral("--"));
-    args.append(path);
+    args.append(QStringLiteral("--file-name"));
+    args.append(QUrl(path).fileName().isEmpty() ? path : QUrl(path).fileName());
 
     QProcess proc;
     proc.start(executable, args);
+    proc.write(data);
+    proc.closeWriteChannel();
     if (!proc.waitForFinished(10000)) {
         if (error)
             *error = QStringLiteral("bat preview timed out");
@@ -332,14 +355,11 @@ QVariantMap PreviewService::loadTextPreview(const QString &path, int maxBytes, i
     result["lineCount"] = lines.size();
 
     if (!binary) {
-        const QString previewPath = localPreviewPath(path);
-        if (!previewPath.isEmpty()) {
-            QString batError;
-            const QByteArray coloredOutput = batPreview(previewPath, maxLines, &batError);
-            if (!coloredOutput.isEmpty()) {
-                result["html"] = ansiToHtml(coloredOutput);
-                result["usesBat"] = true;
-            }
+        QString batError;
+        const QByteArray coloredOutput = batPreview(path, data, maxLines, &batError);
+        if (!coloredOutput.isEmpty()) {
+            result["html"] = ansiToHtml(coloredOutput);
+            result["usesBat"] = true;
         }
     }
 
@@ -444,23 +464,33 @@ QString PreviewService::localPreviewPath(const QString &path) const
     if (!isTrashUri(path))
         return QFileInfo::exists(path) ? path : QString();
 
+    // The cache only ever needs the file being previewed right now; drop the
+    // previous copy so trashed files don't pile up in plaintext forever.
     QString cacheRoot = QDir::homePath() + "/.cache/hyprfm/preview-cache";
+    QDir(cacheRoot).removeRecursively();
     QDir().mkpath(cacheRoot);
+    QFile::setPermissions(cacheRoot, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
 
     const QString suffix = QFileInfo(QUrl(path).fileName()).suffix();
     const QString hash = QString::fromLatin1(QCryptographicHash::hash(path.toUtf8(), QCryptographicHash::Sha1).toHex());
     const QString cachedPath = QDir(cacheRoot).filePath(suffix.isEmpty() ? hash : hash + "." + suffix);
 
+    // ponytail: 64 MB hard cap; larger trashed files simply get no preview.
+    constexpr qint64 kMaxPreviewCopyBytes = 64 * 1024 * 1024;
     QProcess proc;
     startGioCat(proc, encodedUri(path));
-    if (!proc.waitForFinished(10000) || proc.exitCode() != 0)
+    if (!proc.waitForStarted(2000))
+        return {};
+    const QByteArray data = readBoundedOutput(proc, kMaxPreviewCopyBytes + 1);
+    if (proc.exitStatus() != QProcess::NormalExit || proc.exitCode() != 0
+            || data.size() > kMaxPreviewCopyBytes)
         return {};
 
     QFile cacheFile(cachedPath);
     if (!cacheFile.open(QIODevice::WriteOnly | QIODevice::Truncate))
         return {};
 
-    cacheFile.write(proc.readAllStandardOutput());
+    cacheFile.write(data);
     cacheFile.close();
 
     return cachedPath;
@@ -476,7 +506,7 @@ QVariantMap PreviewService::loadFontPreview(const QString &path)
     result["valid"] = false;
     result["error"] = QString();
 
-    if (path.isEmpty() || !QFileInfo::exists(path)) {
+    if (path.isEmpty() || !QFileInfo(path).isFile()) {
         result["error"] = QStringLiteral("Font file not found");
         return result;
     }
@@ -594,18 +624,7 @@ QByteArray PreviewService::readPathBytes(const QString &path, qint64 maxBytes, b
             return {};
         }
 
-        QByteArray data;
-        while (proc.state() != QProcess::NotRunning) {
-            if (!proc.waitForReadyRead(100))
-                proc.waitForFinished(100);
-            data += proc.readAllStandardOutput();
-            if (data.size() >= readLimit) {
-                proc.kill();
-                proc.waitForFinished(1000);
-                break;
-            }
-        }
-        data += proc.readAllStandardOutput();
+        QByteArray data = readBoundedOutput(proc, readLimit);
 
         if (proc.exitStatus() != QProcess::NormalExit && data.isEmpty()) {
             if (error)
@@ -619,6 +638,13 @@ QByteArray PreviewService::readPathBytes(const QString &path, qint64 maxBytes, b
             data.truncate(maxBytes);
         }
         return data;
+    }
+
+    // FIFOs, devices and sockets block open()/read() indefinitely.
+    if (!QFileInfo(path).isFile()) {
+        if (error)
+            *error = QStringLiteral("Not a regular file");
+        return {};
     }
 
     QFile file(path);

@@ -474,6 +474,7 @@ Item {
 
                     Text {
                         Layout.fillWidth: true
+                        textFormat: Text.PlainText
                         text: root.fileName
                         color: Theme.text
                         font.pointSize: Theme.fontLarge + 2
@@ -700,6 +701,7 @@ Item {
                             Text {
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 visible: root.isPdf && root.pdfPreview.error !== ""
+                                textFormat: Text.PlainText
                                 text: root.pdfPreview.error
                                 color: Theme.muted
                                 font.pointSize: Theme.fontSmall
@@ -818,6 +820,7 @@ Item {
                             Text {
                                 Layout.fillWidth: true
                                 visible: directoryPreview.error !== ""
+                                textFormat: Text.PlainText
                                 text: directoryPreview.error
                                 color: Theme.error
                                 font.pointSize: Theme.fontNormal
@@ -885,6 +888,7 @@ Item {
 
                             Text {
                                 anchors.horizontalCenter: parent.horizontalCenter
+                                textFormat: Text.PlainText
                                 text: root.pdfPreview.error !== ""
                                     ? root.pdfPreview.error
                                     : (root.pdfPreviewAvailable
@@ -918,6 +922,7 @@ Item {
                                 Text {
                                     width: parent.width
                                     visible: !root.fontPreview.valid
+                                    textFormat: Text.PlainText
                                     text: root.fontPreview.error || "Unable to load this font"
                                     color: Theme.error
                                     font.pointSize: Theme.fontNormal

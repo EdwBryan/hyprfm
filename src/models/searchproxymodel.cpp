@@ -175,8 +175,10 @@ bool SearchProxyModel::matchesType(const QModelIndex &sourceIndex) const
 {
     bool isDirectory = sourceModel()->data(sourceIndex, FileSystemModel::IsDirRole).toBool();
     QString fp = sourceModel()->data(sourceIndex, FileSystemModel::FilePathRole).toString();
+    // Extension only: the default mode opens and reads every ambiguous file,
+    // per row, on the GUI thread (seconds of freeze in /usr/bin).
     QMimeDatabase db;
-    QString mime = db.mimeTypeForFile(fp).name();
+    QString mime = db.mimeTypeForFile(fp, QMimeDatabase::MatchExtension).name();
 
     // Support comma-separated type filters (OR'd)
     const auto types = m_fileTypeFilter.split(',', Qt::SkipEmptyParts);

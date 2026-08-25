@@ -449,6 +449,23 @@ private slots:
 
     // --- Delete (permanent) ---
 
+    void testCopyDirectoryIntoItselfIsRejected()
+    {
+        TestDir dir;
+        dir.createDir("a");
+        dir.createFile("a/f.txt", "x");
+
+        FileOperations ops;
+        QSignalSpy spy(&ops, &FileOperations::operationFinished);
+
+        ops.copyFiles({dir.path() + "/a"}, dir.path() + "/a");
+
+        if (spy.isEmpty())
+            QVERIFY(spy.wait(30000));
+        QCOMPARE(spy.at(0).at(0).toBool(), false);
+        QVERIFY(!dir.exists("a/a"));
+    }
+
     void testDeleteFile()
     {
         TestDir dir;

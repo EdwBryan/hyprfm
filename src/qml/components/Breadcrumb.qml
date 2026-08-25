@@ -332,6 +332,7 @@ Item {
                         Text {
                             anchors.verticalCenter: parent.verticalCenter
                             width: parent.width - 24
+                            textFormat: Text.PlainText
                             text: modelData.displayPath || modelData.path || ""
                             color: Theme.text
                             font.pointSize: Theme.fontSmall

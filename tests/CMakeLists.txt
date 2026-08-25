@@ -74,6 +74,13 @@ target_include_directories(tst_previewservice PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(tst_previewservice PRIVATE Qt6::Test Qt6::Core Qt6::Gui)
 add_test(NAME tst_previewservice COMMAND tst_previewservice)
 
+add_executable(tst_remoteaccessservice tst_remoteaccessservice.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/remoteaccessservice.cpp
+)
+target_include_directories(tst_remoteaccessservice PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(tst_remoteaccessservice PRIVATE Qt6::Test Qt6::Core)
+add_test(NAME tst_remoteaccessservice COMMAND tst_remoteaccessservice)
+
 add_executable(tst_diskusageservice tst_diskusageservice.cpp
     ${CMAKE_SOURCE_DIR}/src/services/diskusageservice.cpp
 )

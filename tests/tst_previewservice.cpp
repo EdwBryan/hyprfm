@@ -1,5 +1,7 @@
 #include <QTest>
 #include <QThread>
+#include <functional>
+#include <sys/stat.h>
 #include <QDir>
 #include <QFile>
 #include <QPainter>
@@ -69,21 +71,66 @@ private slots:
         }
     }
 
+    // Runs fn on a worker thread and reports whether it returned in time.
+    // A stuck thread is leaked on purpose: deleting a running QThread qFatals.
+    static bool returnsWithin(int ms, std::function<void()> fn)
+    {
+        QThread *thread = QThread::create(std::move(fn));
+        thread->start();
+        const bool finished = thread->wait(ms);
+        if (finished)
+            delete thread;
+        return finished;
+    }
+
     void testAnsiToHtmlSurvivesBareEscape()
     {
         // bat passes non-CSI escapes (e.g. ESC ( B) through verbatim; the
         // converter must consume them instead of spinning forever.
         QString html;
-        QThread *thread = QThread::create([&html]() {
+        QVERIFY2(returnsWithin(3000, [&html]() {
             html = PreviewService::ansiToHtml(QByteArray("hi \x1b(B there\n"));
-        });
-        thread->start();
-        const bool finished = thread->wait(3000);
-        if (finished)
-            delete thread;   // a stuck thread is leaked on purpose; deleting it would qFatal
-        QVERIFY2(finished, "ansiToHtml did not return on a bare ESC byte");
+        }), "ansiToHtml did not return on a bare ESC byte");
         QVERIFY(html.contains("hi"));
         QVERIFY(html.contains("there"));
+    }
+
+    void testFifoPreviewDoesNotBlock()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString fifo = dir.path() + "/notes";
+        QCOMPARE(::mkfifo(fifo.toLocal8Bit().constData(), 0600), 0);
+
+        PreviewService service;
+        QVariantMap preview;
+        QVERIFY2(returnsWithin(3000, [&]() {
+            preview = service.loadTextPreview(fifo, 1024, 20);
+        }), "loadTextPreview blocked on a FIFO");
+        QVERIFY(!preview.value("error").toString().isEmpty());
+    }
+
+    void testBatOutputIsBoundedByMaxBytes()
+    {
+        if (!batAvailable())
+            QSKIP("bat not found in PATH");
+
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        const QString path = dir.path() + "/huge.json";
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("[");
+        file.write(QByteArray(1024 * 1024, '1'));   // one 1 MB line
+        file.write("]");
+        file.close();
+
+        PreviewService service;
+        const QVariantMap preview = service.loadTextPreview(path, 1024, 20);
+        QCOMPARE(preview.value("usesBat").toBool(), true);
+        // highlighting 1 KB of input can never need anything near 64 KB of HTML
+        QVERIFY2(preview.value("html").toString().size() < 64 * 1024,
+                 qPrintable(QString::number(preview.value("html").toString().size())));
     }
 
     void testBinaryPreviewDetection()
@@ -159,6 +206,40 @@ private slots:
         QCOMPARE(preview.value("error").toString(), QString());
         QCOMPARE(preview.value("localPath").toString(), path);
         QVERIFY(preview.value("pageCount").toInt() >= 1);
+    }
+
+    void testTrashPreviewCacheKeepsOnlyCurrentFile()
+    {
+        if (QStandardPaths::findExecutable("gio").isEmpty())
+            QSKIP("gio not found in PATH");
+
+        const QString uniqueId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        const QString dirPath = QDir::homePath() + "/.cache/hyprfm-test-preview-evict-" + uniqueId;
+        QDir().mkpath(dirPath);
+        QStringList uris;
+        for (const char *name : {"one.txt", "two.txt"}) {
+            const QString filePath = dirPath + "/" + name;
+            QFile file(filePath);
+            QVERIFY(file.open(QIODevice::WriteOnly));
+            file.write(name);
+            file.close();
+            QProcess trashProc;
+            trashProc.start("gio", {"trash", filePath});
+            if (!trashProc.waitForFinished(5000) || trashProc.exitCode() != 0)
+                QSKIP("gio trash failed in this environment");
+            const QString uri = findTrashEntryUri(filePath);
+            if (uri.isEmpty())
+                QSKIP("Could not find trashed file URI");
+            uris.append(uri);
+        }
+        QDir().rmdir(dirPath);
+
+        PreviewService service;
+        const QString first = service.localPreviewPath(uris.at(0));
+        QVERIFY(QFile::exists(first));
+        const QString second = service.localPreviewPath(uris.at(1));
+        QVERIFY(QFile::exists(second));
+        QVERIFY2(!QFile::exists(first), "previous trash preview copy was not evicted");
     }
 
     void testTrashTextPreview()

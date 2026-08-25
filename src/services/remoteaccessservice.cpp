@@ -53,37 +53,41 @@ void RemoteAccessService::connectToLocation(const QString &uri)
     }
 
     if (m_process) {
+        // Its signals must not reach the handlers below once a new process
+        // owns m_process; ~QProcess emits them synchronously on kill.
+        disconnect(m_process, nullptr, this, nullptr);
         m_process->kill();
         m_process->deleteLater();
         m_process = nullptr;
     }
 
     m_pendingUri = trimmedUri;
-    m_process = new QProcess(this);
+    QProcess *process = new QProcess(this);
+    m_process = process;
     emit busyChanged();
 
-    connect(m_process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
-            [this](int exitCode, QProcess::ExitStatus) {
-        const QString error = exitCode == 0
-            ? QString()
-            : QString::fromUtf8(m_process->readAllStandardError()).trimmed();
-        emit connectionFinished(exitCode == 0, m_pendingUri, error);
-        m_process->deleteLater();
+    // errorOccurred(Crashed) and finished() fire for the same event; whichever
+    // runs first settles the connection and the other bails on the guard.
+    auto settle = [this, process](bool success, const QString &error) {
+        if (process != m_process)
+            return;
+        emit connectionFinished(success, m_pendingUri, error);
+        process->deleteLater();
         m_process = nullptr;
         m_pendingUri.clear();
         emit busyChanged();
+    };
+
+    connect(process, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), this,
+            [process, settle](int exitCode, QProcess::ExitStatus) {
+        settle(exitCode == 0, exitCode == 0
+            ? QString()
+            : QString::fromUtf8(process->readAllStandardError()).trimmed());
     });
 
-    connect(m_process, &QProcess::errorOccurred, this, [this](QProcess::ProcessError) {
-        const QString error = m_process ? m_process->errorString() : QStringLiteral("Failed to start gio mount");
-        emit connectionFinished(false, m_pendingUri, error);
-        if (m_process) {
-            m_process->deleteLater();
-            m_process = nullptr;
-        }
-        m_pendingUri.clear();
-        emit busyChanged();
+    connect(process, &QProcess::errorOccurred, this, [process, settle](QProcess::ProcessError) {
+        settle(false, process->errorString());
     });
 
-    m_process->start(QStringLiteral("gio"), {QStringLiteral("mount"), trimmedUri});
+    process->start(QStringLiteral("gio"), {QStringLiteral("mount"), trimmedUri});
 }

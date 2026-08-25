@@ -107,6 +107,26 @@ private slots:
         QCOMPARE(proxy.rowCount(), 1);
     }
 
+    void testTypeFilterDoesNotSniffFileContent()
+    {
+        TestDir dir;
+        // PNG magic bytes but no extension: a content sniff would call this an
+        // image; the filter must go by extension only (one open+read per row
+        // on the GUI thread is what froze /usr/bin).
+        dir.createFile("photo", QByteArray("\x89PNG\r\n\x1a\n", 8));
+        dir.createFile("real.png", QByteArray("\x89PNG\r\n\x1a\n", 8));
+
+        FileSystemModel source;
+        source.setSynchronousReload(true);
+        source.setRootPath(dir.path());
+
+        SearchProxyModel proxy;
+        proxy.setSourceModel(&source);
+        proxy.setFileTypeFilter("images");
+        QCOMPARE(proxy.rowCount(), 1);
+        QCOMPARE(proxy.fileName(0), QString("real.png"));
+    }
+
     void testSizeFilter()
     {
         TestDir dir;

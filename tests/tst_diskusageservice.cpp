@@ -5,6 +5,7 @@
 #include <QStandardPaths>
 #include <QTemporaryDir>
 #include <QTest>
+#include <QLocale>
 
 #include <unistd.h>
 
@@ -35,6 +36,16 @@ class TestDiskUsageService : public QObject
     Q_OBJECT
 
 private slots:
+    void testFormattedSizeUsesLocaleDecimalSeparator()
+    {
+        QLocale::setDefault(QLocale(QLocale::German, QLocale::Germany));
+        const QString text = DiskUsageService::formattedSize(1536);
+        const QString verbose = DiskUsageService::formattedSize(1536, true);
+        QLocale::setDefault(QLocale::c());
+        QCOMPARE(text, QString("1,5 KB"));
+        QCOMPARE(verbose, QString("1,5 KB (1.536 bytes)"));
+    }
+
     void testRequestSizeForNestedFolder()
     {
         if (QStandardPaths::findExecutable(QStringLiteral("du")).isEmpty())

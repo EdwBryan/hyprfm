@@ -52,6 +52,7 @@ Item {
                     Text {
                         id: toastText
                         anchors.centerIn: parent
+                        textFormat: Text.PlainText
                         text: toastItem.message
                         color: Theme.text
                         font.pointSize: Theme.fontNormal

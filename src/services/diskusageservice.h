@@ -2,6 +2,7 @@
 
 #include <QObject>
 #include <QHash>
+#include <QLocale>
 #include <QSet>
 #include <QStringList>
 #include <QThread>
@@ -75,7 +76,32 @@ private:
     };
 
     static QString normalizePath(const QString &path);
-    static QString formattedSize(qint64 size, bool verbose = false);
+
+public:
+    // Locale-aware ("1,5 KB" in de_DE). Header-inline so models can share it
+    // without linking the service.
+    static QString formattedSize(qint64 size, bool verbose = false)
+    {
+        if (size < 0)
+            return {};
+        const QLocale locale;
+        auto fmt = [&](double value, int precision, const char *unit) {
+            QString text = QStringLiteral("%1 %2").arg(locale.toString(value, 'f', precision), QLatin1String(unit));
+            if (verbose)
+                text += QStringLiteral(" (%1 bytes)").arg(locale.toString(size));
+            return text;
+        };
+        if (size < 1024)
+            return verbose ? QStringLiteral("%1 B (%2 bytes)").arg(size).arg(locale.toString(size))
+                           : QStringLiteral("%1 B").arg(size);
+        if (size < 1024 * 1024)
+            return fmt(size / 1024.0, 1, "KB");
+        if (size < 1024LL * 1024 * 1024)
+            return fmt(size / (1024.0 * 1024.0), 1, "MB");
+        return fmt(size / (1024.0 * 1024.0 * 1024.0), verbose ? 2 : 1, "GB");
+    }
+
+private:
     bool tryCachedSize(const QString &path, qint64 *size);
     void rememberCachedSize(const QString &path, qint64 size);
     void removeCachedPath(const QString &path);

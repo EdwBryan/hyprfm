@@ -305,6 +305,7 @@ FocusScope {
                         Text {
                             width: parent.width - root.millerIconSize - parent.spacing - (parentDelegate.isDir ? root.millerIconSize : 0) - parent.anchors.leftMargin - parent.anchors.rightMargin
                             anchors.verticalCenter: parent.verticalCenter
+                            textFormat: Text.PlainText
                             text: parentDelegate.fileName
                             color: parentDelegate.isCurrentDir ? Theme.text : Theme.subtext
                             font.pointSize: Theme.fontSmall
@@ -911,6 +912,7 @@ FocusScope {
                         Text {
                             width: parent.width - (root.millerIconSize + 2) - (currentDelegate.isDir ? (root.millerIconSize + 2) : 0) - parent.spacing * (currentDelegate.isDir ? 2 : 1) - parent.anchors.leftMargin - parent.anchors.rightMargin
                             anchors.verticalCenter: parent.verticalCenter
+                            textFormat: Text.PlainText
                             text: currentDelegate.fileName
                             color: Theme.text
                             font.pointSize: Theme.fontSmall
@@ -1402,6 +1404,7 @@ FocusScope {
                                 Text {
                                     width: parent.width - 14 - parent.spacing - parent.anchors.leftMargin - parent.anchors.rightMargin
                                     anchors.verticalCenter: parent.verticalCenter
+                                    textFormat: Text.PlainText
                                     text: fileName
                                     color: Theme.subtext
                                     font.pointSize: Theme.fontSmall
@@ -1435,6 +1438,7 @@ FocusScope {
                             anchors.right: parent.right
                             anchors.margins: 8
                             visible: previewColumn.directoryPreview.error !== ""
+                            textFormat: Text.PlainText
                             text: previewColumn.directoryPreview.error
                             color: Theme.error
                             font.pointSize: Theme.fontSmall
@@ -1712,6 +1716,7 @@ FocusScope {
                         Text {
                             anchors.horizontalCenter: parent.horizontalCenter
                             width: 220
+                            textFormat: Text.PlainText
                             text: previewColumn.pdfPreview.error !== ""
                                 ? previewColumn.pdfPreview.error
                                 : runtimeFeatures.installHint("pdfPreview")
@@ -1743,6 +1748,7 @@ FocusScope {
                             Text {
                                 width: parent.width
                                 visible: !previewColumn.fontPreview.valid
+                                textFormat: Text.PlainText
                                 text: previewColumn.fontPreview.error || "Unable to load this font"
                                 color: Theme.error
                                 font.pointSize: Theme.fontSmall

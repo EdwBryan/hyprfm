@@ -1315,6 +1315,11 @@ void FileOperations::transferResolvedItems(const QVariantList &operations, bool 
             return;
         }
 
+        if (targetPath.startsWith(sourcePath + QLatin1Char('/'))) {
+            emit operationFinished(false, QString("Cannot copy %1 into itself").arg(locationFileName(sourcePath)));
+            return;
+        }
+
         item["sourcePath"] = sourcePath;
         item["targetPath"] = targetPath;
         item["backupPath"] = backupPath;

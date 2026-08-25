@@ -419,6 +419,7 @@ Q.Dialog {
     Text {
         Layout.fillWidth: true
         visible: errorText !== ""
+        textFormat: Text.PlainText
         text: errorText
         color: Theme.error
         font.pointSize: Theme.fontSmall
