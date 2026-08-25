@@ -3,6 +3,7 @@
 #include "third_party/toml.hpp"
 #include <QFile>
 #include <QDir>
+#include <QFileInfo>
 #include <QDebug>
 
 QMap<QString, QColor> ThemeLoader::s_defaults = {
@@ -15,11 +16,68 @@ QMap<QString, QColor> ThemeLoader::s_defaults = {
     {"purple", QColor("#cba6f7")},
 };
 
-ThemeLoader::ThemeLoader(QObject *parent) : QObject(parent), m_colors(s_defaults) {}
+ThemeLoader::ThemeLoader(QObject *parent) : QObject(parent), m_colors(s_defaults)
+{
+    // Same trick ConfigManager uses: editors save by writing a temp file and
+    // renaming over the target, which gives the theme a new inode and drops a
+    // file-only watch. Watch the containing directory too and re-arm from
+    // either signal.
+    const auto rearmAndReload = [this]() {
+        if (m_watchedPath.isEmpty())
+            return;
+        const QFileInfo info(m_watchedPath);
+        if (!info.exists())
+            return;
+        if (!m_watcher.files().contains(m_watchedPath))
+            m_watcher.addPath(m_watchedPath);
+        // The directory signal also fires for sibling themes, so only reload
+        // when the theme actually in use moved on.
+        if (info.lastModified() == m_watchedModified)
+            return;
+        m_watchedModified = info.lastModified();
+        applyThemeFile(m_watchedPath);
+    };
+    connect(&m_watcher, &QFileSystemWatcher::fileChanged, this, rearmAndReload);
+    connect(&m_watcher, &QFileSystemWatcher::directoryChanged, this, rearmAndReload);
+}
+
+void ThemeLoader::watchThemeFile(const QString &filePath)
+{
+    if (filePath == m_watchedPath)
+        return;
+    if (!m_watcher.files().isEmpty())
+        m_watcher.removePaths(m_watcher.files());
+    if (!m_watcher.directories().isEmpty())
+        m_watcher.removePaths(m_watcher.directories());
+    m_watchedPath = filePath;
+    m_watchedModified = QFileInfo(filePath).lastModified();
+    m_watcher.addPath(filePath);
+    m_watcher.addPath(QFileInfo(filePath).absolutePath());
+}
+
+void ThemeLoader::applyThemeFile(const QString &filePath)
+{
+    m_colors = s_defaults;
+    try {
+        auto config = toml::parse_file(filePath.toStdString());
+        if (auto colors = config["colors"].as_table()) {
+            for (const auto &[key, val] : *colors) {
+                if (auto v = val.value<std::string>()) {
+                    QString colorStr = QString::fromStdString(*v);
+                    QColor c(colorStr);
+                    if (c.isValid())
+                        m_colors[QString::fromStdString(std::string(key))] = c;
+                }
+            }
+        }
+    } catch (const toml::parse_error &err) {
+        qWarning() << "Theme parse error:" << err.what();
+    }
+    emit themeChanged();
+}
 
 void ThemeLoader::loadTheme(const QString &nameOrPath, const QStringList &themesDirs)
 {
-    m_colors = s_defaults;
     QString filePath;
     if (QFile::exists(nameOrPath)) {
         filePath = nameOrPath;
@@ -37,25 +95,12 @@ void ThemeLoader::loadTheme(const QString &nameOrPath, const QStringList &themes
     }
     if (filePath.isEmpty() || !QFile::exists(filePath)) {
         qWarning() << "Theme not found:" << nameOrPath;
+        m_colors = s_defaults;
         emit themeChanged();
         return;
     }
-    try {
-        auto config = toml::parse_file(filePath.toStdString());
-        if (auto colors = config["colors"].as_table()) {
-            for (const auto &[key, val] : *colors) {
-                if (auto v = val.value<std::string>()) {
-                    QString colorStr = QString::fromStdString(*v);
-                    QColor c(colorStr);
-                    if (c.isValid())
-                        m_colors[QString::fromStdString(std::string(key))] = c;
-                }
-            }
-        }
-    } catch (const toml::parse_error &err) {
-        qWarning() << "Theme parse error:" << err.what();
-    }
-    emit themeChanged();
+    watchThemeFile(QFileInfo(filePath).absoluteFilePath());
+    applyThemeFile(filePath);
 }
 
 QColor ThemeLoader::color(const QString &name) const

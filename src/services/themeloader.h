@@ -2,6 +2,8 @@
 #include <QObject>
 #include <QColor>
 #include <QMap>
+#include <QDateTime>
+#include <QFileSystemWatcher>
 
 class ThemeLoader : public QObject
 {
@@ -38,6 +40,12 @@ public:
 signals:
     void themeChanged();
 private:
+    void applyThemeFile(const QString &filePath);
+    void watchThemeFile(const QString &filePath);
+
     QMap<QString, QColor> m_colors;
+    QFileSystemWatcher m_watcher;
+    QString m_watchedPath;
+    QDateTime m_watchedModified;
     static QMap<QString, QColor> s_defaults;
 };

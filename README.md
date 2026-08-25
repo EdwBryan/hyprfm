@@ -296,7 +296,24 @@ paths = ["~/Documents", "~/Downloads", "~/Pictures", "~/Projects"]
 
 ## 🎨 Theming
 
-Themes are TOML files in `themes/`. Drop a new file there or in `~/.config/hyprfm/themes/` and reference it from config:
+Themes are plain TOML files — nothing is hardcoded in the binary. The bundled
+Catppuccin themes ship as `/usr/share/hyprfm/themes/*.toml`; copy one as a
+starting point:
+
+```sh
+cp /usr/share/hyprfm/themes/catppuccin-mocha.toml ~/.config/hyprfm/themes/mytheme.toml
+```
+
+`~/.config/hyprfm/themes/` is created on first run and searched first, so a file
+there shadows a bundled theme of the same name. Every `*.toml` in either
+directory appears in the theme picker. Select it there, or set it in config:
+
+```toml
+[general]
+theme = "mytheme"
+```
+
+A theme is just a colour table — any key you omit falls back to the default:
 
 ```toml
 [colors]
@@ -313,6 +330,9 @@ success = "#a6e3a1"
 warning = "#f9e2af"
 error   = "#f38ba8"
 ```
+
+`~/.config/hyprfm/themes/example.toml.sample` is written on first run with the
+same table plus a comment per colour, so the directory documents itself.
 
 Themes reload live on save.
 

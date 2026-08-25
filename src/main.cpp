@@ -123,6 +123,31 @@ private:
     bool m_applying = false;
 };
 
+const char kExampleTheme[] = R"(# HyprFM theme sample.
+#
+# Copy this file to "mytheme.toml" in this directory, edit the colours, then put
+#     [general]
+#     theme = "mytheme"
+# in ~/.config/hyprfm/config.toml, or pick it in Settings. Every *.toml here is
+# listed there, and a file here shadows the bundled theme of the same name.
+#
+# Any key you leave out keeps its built-in default.
+
+[colors]
+base    = "#1e1e2e"  # file view background
+mantle  = "#181825"  # toolbar, dialogs, breadcrumb
+crust   = "#11111b"  # deepest layer: title bar, sidebar
+surface = "#313244"  # cards, inputs, hovered rows
+overlay = "#45475a"  # borders, separators, inactive marks
+text    = "#cdd6f4"  # primary text
+subtext = "#bac2de"  # secondary text
+muted   = "#6c7086"  # icons, disabled text
+accent  = "#89b4fa"  # selection, focus ring, links
+success = "#a6e3a1"  # completed operations
+warning = "#f9e2af"  # warnings
+error   = "#f38ba8"  # errors, destructive actions
+)";
+
 } // namespace
 
 int main(int argc, char *argv[])
@@ -318,8 +343,16 @@ int main(int argc, char *argv[])
     // the bundled set.
     QStringList themeDirs;
     const QString userThemesDir = configDir + "/themes";
-    if (QDir(userThemesDir).exists())
-        themeDirs.append(QDir::cleanPath(userThemesDir));
+    const bool freshThemesDir = !QDir(userThemesDir).exists();
+    QDir().mkpath(userThemesDir);
+    if (freshThemesDir) {
+        // Seed the directory with a documented sample so it explains itself.
+        // The ".sample" suffix keeps it out of the "*.toml" theme picker.
+        QFile sample(userThemesDir + "/example.toml.sample");
+        if (sample.open(QIODevice::WriteOnly | QIODevice::Text))
+            sample.write(kExampleTheme);
+    }
+    themeDirs.append(QDir::cleanPath(userThemesDir));
     const QString themesDir = firstExistingDir(themeSearchPaths);
     if (!themesDir.isEmpty())
         themeDirs.append(themesDir);

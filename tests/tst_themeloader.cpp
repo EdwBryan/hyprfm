@@ -198,6 +198,32 @@ private slots:
         loader.loadTheme("catppuccin-latte", dirs);
         QCOMPARE(loader.color("base"), QColor("#eff1f5"));
     }
+
+    void testEditingTheLoadedThemeReloadsIt()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath("live.toml");
+        QFile file(path);
+        QVERIFY(file.open(QIODevice::WriteOnly));
+        file.write("[colors]\nbase = \"#111111\"\n");
+        file.close();
+
+        ThemeLoader loader;
+        loader.loadTheme("live", QStringList{dir.path()});
+        QCOMPARE(loader.color("base"), QColor("#111111"));
+
+        QSignalSpy spy(&loader, &ThemeLoader::themeChanged);
+
+        // The mtime guard has one-second resolution on some filesystems, so
+        // make sure the rewrite lands in a later second than the load.
+        QTest::qWait(1100);
+        QVERIFY(file.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        file.write("[colors]\nbase = \"#222222\"\n");
+        file.close();
+
+        QVERIFY(spy.wait(5000));
+        QCOMPARE(loader.color("base"), QColor("#222222"));
+    }
 };
 
 QTEST_MAIN(TestThemeLoader)
