@@ -145,7 +145,8 @@ fi
 git add "$CMAKE_FILE" "$FLATPAK_FILE" "$META_FILE"
 git commit -m "chore: release $TAG"
 if [ -n "$NOTES_FILE" ]; then
-    git tag -a "$TAG" -F "$NOTES_FILE"
+    # verbatim: Markdown headings start with "#", which git would otherwise strip as comments
+    git tag -a "$TAG" --cleanup=verbatim -F "$NOTES_FILE"
 else
     git tag -a "$TAG" -m "Release $VERSION"
 fi
