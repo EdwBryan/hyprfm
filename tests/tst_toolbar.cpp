@@ -4,6 +4,7 @@
 #include <QWheelEvent>
 #include "viewharness.h"
 #include "models/tablistmodel.h"
+#include <QJsonArray>
 
 class TestToolbar : public QObject
 {
@@ -116,6 +117,74 @@ private slots:
         QTRY_VERIFY(second->property("slideOffset").toReal() > 1);
         QTRY_COMPARE(second->property("slideOffset").toReal(), 0.0);
         QTest::mouseRelease(&h.view, Qt::LeftButton, {}, h.center(second) + QPoint(10, 0));
+    }
+
+    // Close tabs quickly with the middle button (each runs an exit animation),
+    // "restart" by restoring the saved session into a fresh toolbar, add tabs.
+    // Every tab must be visible and together fill the strip — no gap.
+    void testRapidClosesThenRestartLeavesNoGap()
+    {
+        QJsonArray session;
+        int activeIndex = 0;
+        {
+            ToolbarHarness h;
+            QVERIFY(h.loadToolbar(8));
+            for (int i = 0; i < 8; ++i)
+                h.tabs.tabAt(i)->navigateTo(QStringLiteral("/t%1").arg(i));
+            QTest::qWait(400);
+            // left-to-right so every later close sees shifted indices
+            for (int i = 0; i < 7; ++i) {
+                QQuickItem *tab = h.item(QStringLiteral("toolbarTab_%1").arg(i));
+                QVERIFY(tab);
+                QTest::mouseClick(&h.view, Qt::MiddleButton, {}, h.center(tab));
+                QTest::qWait(20);
+            }
+            QTest::qWait(800);   // exit animations
+            QCOMPARE(h.tabs.rowCount(), 1);
+            QCOMPARE(h.tabs.tabAt(0)->currentPath(), QString("/t7"));   // the one we did not close
+            session = h.tabs.saveSession();
+            activeIndex = h.tabs.activeIndex();
+        }
+
+        ToolbarHarness h;
+        h.tabs.restoreSession(session, activeIndex);
+        QVERIFY(h.loadToolbar(1));
+        h.tabs.addTab();
+        h.tabs.addTab();
+        QTest::qWait(600);
+        QQuickItem *strip = h.item("tabStrip");
+        QVERIFY(strip);
+        qreal total = 0;
+        for (int i = 0; i < 3; ++i) {
+            QQuickItem *tab = h.item(QStringLiteral("toolbarTab_%1").arg(i));
+            QVERIFY(tab);
+            QVERIFY2(tab->opacity() > 0.9 && tab->width() > 100,
+                     qPrintable(QStringLiteral("tab %1: opacity %2 width %3").arg(i).arg(tab->opacity()).arg(tab->width())));
+            total += tab->width();
+        }
+        QVERIFY2(qAbs(total - strip->width()) < 2, qPrintable(QStringLiteral("tabs %1 vs strip %2").arg(total).arg(strip->width())));
+    }
+
+    // Start like a restored session with a single tab (bar hidden, height 0),
+    // then open tabs: the strip must show the first tab at x=0, no gap.
+    void testOpeningTabsFromHiddenBarStartsAtZero()
+    {
+        ToolbarHarness h;
+        QVERIFY(h.loadToolbar(1));
+        QTest::qWait(200);
+        h.tabs.addTab();
+        QTest::qWait(50);
+        h.tabs.addTab();
+        QTest::qWait(700);   // bar height animation + enter animations
+        QQuickItem *strip = h.item("tabStrip");
+        QQuickItem *first = h.item("toolbarTab_0");
+        QVERIFY(strip && first);
+        QCOMPARE(strip->property("contentX").toReal(), 0.0);
+        QCOMPARE(int(first->mapToItem(strip, QPointF(0, 0)).x()), 0);
+        qreal total = 0;
+        for (int i = 0; i < 3; ++i)
+            total += h.item(QStringLiteral("toolbarTab_%1").arg(i))->width();
+        QVERIFY2(qAbs(total - strip->width()) < 2, qPrintable(QStringLiteral("tabs %1 strip %2").arg(total).arg(strip->width())));
     }
 
     void testFewTabsShareTheWidth()

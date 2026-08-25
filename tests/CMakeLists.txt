@@ -154,9 +154,48 @@ target_link_libraries(tst_toolbar PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Qml 
 add_dependencies(tst_toolbar hyprfm)
 add_test(NAME tst_toolbar COMMAND tst_toolbar)
 
+add_executable(tst_mainwindow tst_mainwindow.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/configmanager.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/themeloader.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/clipboardmanager.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/fileoperations.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/giotransferworker.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/draghelper.cpp
+    ${CMAKE_SOURCE_DIR}/src/models/tabmodel.cpp
+    ${CMAKE_SOURCE_DIR}/src/models/tablistmodel.cpp
+    ${CMAKE_SOURCE_DIR}/src/models/bookmarkmodel.cpp
+    ${CMAKE_SOURCE_DIR}/src/models/filesystemmodel.cpp
+    ${CMAKE_SOURCE_DIR}/src/models/devicemodel.cpp
+    ${CMAKE_SOURCE_DIR}/src/models/recentfilesmodel.cpp
+    ${CMAKE_SOURCE_DIR}/src/models/searchresultsmodel.cpp
+    ${CMAKE_SOURCE_DIR}/src/models/searchproxymodel.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/searchservice.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/undomanager.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/previewservice.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/diskusageservice.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/remoteaccessservice.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/runtimefeaturesservice.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/dependencychecker.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/gitstatusservice.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/metadataextractor.cpp
+    ${CMAKE_SOURCE_DIR}/src/providers/thumbnailprovider.cpp
+    ${CMAKE_SOURCE_DIR}/src/providers/pdfpreviewprovider.cpp
+)
+target_include_directories(tst_mainwindow PRIVATE ${CMAKE_SOURCE_DIR}/src ${CMAKE_SOURCE_DIR}/src/third_party)
+target_compile_definitions(tst_mainwindow PRIVATE
+    TEST_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+    TEST_MODULE_DIR="${CMAKE_BINARY_DIR}/src"
+    HYPRFM_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+    HYPRFM_DATA_DIR="${CMAKE_SOURCE_DIR}"
+    HYPRFM_VERSION="test"
+)
+target_link_libraries(tst_mainwindow PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::DBus Qt6::Widgets Qt6::Svg Qt6::Network Qt6::Concurrent PkgConfig::GIO)
+add_dependencies(tst_mainwindow hyprfm)
+add_test(NAME tst_mainwindow COMMAND tst_mainwindow)
+
 # The view harnesses assert pixel geometry of a 900x600 window; a tiling
 # compositor would resize a real window, so keep them on the offscreen QPA.
-set_tests_properties(tst_detailedview tst_millerview tst_toolbar PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+set_tests_properties(tst_detailedview tst_millerview tst_toolbar tst_mainwindow PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_devicemodel tst_devicemodel.cpp
     ${CMAKE_SOURCE_DIR}/src/models/devicemodel.cpp

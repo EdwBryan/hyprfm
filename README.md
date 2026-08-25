@@ -256,7 +256,7 @@ All shortcuts can be remapped in `~/.config/hyprfm/config.toml` under the `[shor
 
 ## ⚙️ Configuration
 
-Config lives at `~/.config/hyprfm/config.toml` and is created with sensible defaults on first run.
+Config lives at `~/.config/hyprfm/config.toml`. On first run HyprFM writes it fully commented; changing settings inside the app rewrites the file without comments, so `~/.config/hyprfm/config.toml.sample` (regenerated on every start) is the always-documented reference.
 
 ```toml
 [general]

@@ -92,6 +92,83 @@ private slots:
         QCOMPARE(reloaded.millerFractions().value("current").toDouble(), 0.76);
     }
 
+    void testDocumentedTemplateLoadsToDefaults()
+    {
+        QTemporaryDir dir;
+        ConfigManager defaults(dir.path() + "/defaults.toml");
+
+        const QString path = dir.path() + "/config.toml";
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write(ConfigManager::documentedConfigTemplate().toUtf8());
+        f.close();
+        ConfigManager fromTemplate(path);
+
+        QCOMPARE(fromTemplate.theme(), defaults.theme());
+        QCOMPARE(fromTemplate.iconTheme(), defaults.iconTheme());
+        QCOMPARE(fromTemplate.builtinIcons(), defaults.builtinIcons());
+        QCOMPARE(fromTemplate.fontFamily(), defaults.fontFamily());
+        QCOMPARE(fromTemplate.defaultView(), defaults.defaultView());
+        QCOMPARE(fromTemplate.showHidden(), defaults.showHidden());
+        QCOMPARE(fromTemplate.sortBy(), defaults.sortBy());
+        QCOMPARE(fromTemplate.sortAscending(), defaults.sortAscending());
+        QCOMPARE(fromTemplate.rememberSortPerFolder(), defaults.rememberSortPerFolder());
+        QCOMPARE(fromTemplate.dependencyStartupCheck(), defaults.dependencyStartupCheck());
+        QCOMPARE(fromTemplate.sidebarPosition(), defaults.sidebarPosition());
+        QCOMPARE(fromTemplate.sidebarWidth(), defaults.sidebarWidth());
+        QCOMPARE(fromTemplate.sidebarVisible(), defaults.sidebarVisible());
+        QCOMPARE(fromTemplate.hiddenQuickAccess(), defaults.hiddenQuickAccess());
+        QCOMPARE(fromTemplate.radiusSmall(), defaults.radiusSmall());
+        QCOMPARE(fromTemplate.radiusMedium(), defaults.radiusMedium());
+        QCOMPARE(fromTemplate.radiusLarge(), defaults.radiusLarge());
+        QCOMPARE(fromTemplate.transparencyEnabled(), defaults.transparencyEnabled());
+        QCOMPARE(fromTemplate.transparencyLevel(), defaults.transparencyLevel());
+        QCOMPARE(fromTemplate.animationsEnabled(), defaults.animationsEnabled());
+        QCOMPARE(fromTemplate.animDurationFast(), defaults.animDurationFast());
+        QCOMPARE(fromTemplate.animDuration(), defaults.animDuration());
+        QCOMPARE(fromTemplate.animDurationSlow(), defaults.animDurationSlow());
+        QCOMPARE(fromTemplate.animCurveEnter(), defaults.animCurveEnter());
+        QCOMPARE(fromTemplate.animCurveExit(), defaults.animCurveExit());
+        QCOMPARE(fromTemplate.animCurveTransition(), defaults.animCurveTransition());
+        QCOMPARE(fromTemplate.windowButtonLayout(), defaults.windowButtonLayout());
+        QCOMPARE(fromTemplate.listColumns(), defaults.listColumns());
+        QCOMPARE(fromTemplate.listColumnWidths(), defaults.listColumnWidths());
+        QCOMPARE(fromTemplate.millerFractions(), defaults.millerFractions());
+        QCOMPARE(fromTemplate.bookmarks(), defaults.bookmarks());
+        QCOMPARE(fromTemplate.shortcutMap(), defaults.shortcutMap());
+    }
+
+    void testFirstRunSeedsDocumentedConfigAndSample()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.path() + "/config.toml";
+        ConfigManager mgr(path);
+        QVERIFY(QFile::exists(path));
+        QVERIFY(QFile::exists(path + ".sample"));
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        const QString text = QString::fromUtf8(f.readAll());
+        QVERIFY(text.contains("[general]"));
+        QVERIFY(text.contains("# "));   // it is the documented template, not a bare dump
+        QVERIFY(text.contains("default_view"));
+    }
+
+    void testExistingConfigIsNotOverwrittenBySeeding()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.path() + "/config.toml";
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("[general]\ndefault_view = \"miller\"\n");
+        f.close();
+        ConfigManager mgr(path);
+        QCOMPARE(mgr.defaultView(), QString("miller"));
+        QFile again(path);
+        QVERIFY(again.open(QIODevice::ReadOnly));
+        QCOMPARE(QString::fromUtf8(again.readAll()), QString("[general]\ndefault_view = \"miller\"\n"));
+        QVERIFY(QFile::exists(path + ".sample"));   // the reference is still refreshed
+    }
+
     void testDefaultValues()
     {
         QTemporaryDir dir;

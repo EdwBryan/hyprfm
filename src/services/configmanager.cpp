@@ -165,6 +165,7 @@ ConfigManager::ConfigManager(const QString &configPath, QObject *parent, const Q
     , m_defaultThemeName(defaultTheme)
 {
     setDefaults();
+    seedDocumentedConfig();
     loadConfig();
     loadFolderSort();
 
@@ -496,6 +497,178 @@ void ConfigManager::saveMillerFractions(double parent, double current)
         m_watcher.addPath(m_configPath);
     }
     emit millerFractionsChanged();
+}
+
+QString ConfigManager::documentedConfigTemplate()
+{
+    return QStringLiteral(R"(# HyprFM configuration — ~/.config/hyprfm/config.toml
+#
+# Every key below is at its default; delete or comment out anything you do
+# not want to override. Changes are picked up live while HyprFM runs.
+#
+# NOTE: when you change a setting inside HyprFM (Settings panel, column
+# drags, bookmarks…) the app rewrites this file and these comments are lost.
+# config.toml.sample next to it is regenerated on every start and always
+# has the full documented set of keys for the version you are running.
+
+[general]
+# Colour theme: a file name from /usr/share/hyprfm/themes or
+# ~/.config/hyprfm/themes without ".toml". Unset = follow the system
+# light/dark preference (catppuccin-latte / catppuccin-mocha).
+# theme = "catppuccin-mocha"
+
+# System icon theme used when a bundled icon is missing.
+icon_theme = "Adwaita"
+
+# Prefer HyprFM's bundled SVG icons over the system icon theme.
+builtin_icons = true
+
+# UI font family. Empty = the desktop's UI font.
+font_family = ""
+
+# View for new tabs: "grid" | "detailed" | "miller"
+default_view = "grid"
+
+show_hidden = false
+
+# Sort order: "name" | "size" | "modified" | "type"
+sort_by = "name"
+sort_ascending = true
+
+# Remember a different sort per folder (stored in folder_sort.json).
+remember_sort_per_folder = true
+
+# Warn at startup when an optional tool (ffmpeg, bat, pdftoppm…) is missing.
+dependency_startup_check = true
+
+[sidebar]
+# "left" | "right"
+position = "left"
+width = 200
+visible = true
+# Quick-access entries to hide. Valid names:
+# "Home", "Recents", "Trash", "Network", "Pictures", "Downloads"
+hidden_quick_access = []
+
+[appearance]
+# Corner radii in pixels.
+radius_small = 4
+radius_medium = 8
+radius_large = 12
+
+# Window transparency (needs compositor blur rules to look good).
+# transparency_level: 0.0 (fully transparent) .. 1.0 (opaque)
+transparency_enabled = true
+transparency_level = 1.0
+
+# Animations. Durations in milliseconds; curves are Qt easing names:
+# Linear | InCubic | OutCubic | InOutCubic | OutBack | InOutQuad | OutQuad
+# | OutExpo | InOutExpo | Bezier
+animations_enabled = true
+anim_duration_fast = 100
+anim_duration = 200
+anim_duration_slow = 350
+anim_curve_enter = "OutCubic"
+anim_curve_exit = "InCubic"
+anim_curve_transition = "Bezier"
+
+[window]
+# Draw minimize/maximize/close buttons in HyprFM's own title bar.
+# Unset = on only when the compositor provides no decorations.
+# show_controls = false
+# Button order, ":" separates left from right side.
+button_layout = ":minimize,maximize,close"
+
+[list_view]
+# Columns of the detailed view, in display order. "name" is always present.
+# Available: name, size, modified, type, permissions, owner, group, created,
+# accessed, extension, mime, git, symlink
+# Right-click the header to toggle columns, drag headers to reorder, drag the
+# line between two headers to resize.
+columns = ["name", "size", "modified", "type"]
+column_widths = { size = 110, modified = 140, type = 80 }
+
+[miller_view]
+# Column widths as fractions of the view; the preview column takes the rest.
+# Each column keeps at least 0.12. Drag the lines between columns to change.
+parent_fraction = 0.2
+current_fraction = 0.5
+
+[bookmarks]
+# Sidebar bookmarks. Unset = the XDG user folders that exist on this machine.
+# paths = ["~/Documents", "~/Downloads", "~/Pictures", "~/Projects"]
+
+[shortcuts]
+# Override any shortcut with a Qt key sequence. Defaults:
+# open              = "Return"
+# back              = "Alt+Left"
+# forward           = "Alt+Right"
+# parent            = "Alt+Up"
+# home              = "Alt+Home"
+# refresh           = "F5"
+# new_tab           = "Ctrl+T"
+# new_window        = "Ctrl+Alt+N"
+# close_tab         = "Ctrl+W"
+# next_tab          = "Ctrl+Tab"
+# previous_tab      = "Ctrl+Shift+Tab"
+# reopen_tab        = "Ctrl+Shift+T"
+# open_in_new_tab   = "Ctrl+Return"
+# open_in_split     = "Ctrl+Shift+Return"
+# copy              = "Ctrl+C"
+# cut               = "Ctrl+X"
+# paste             = "Ctrl+V"
+# rename            = "F2"
+# new_folder        = "Ctrl+Shift+N"
+# new_file          = "Ctrl+N"
+# trash             = "Delete"
+# permanent_delete  = "Shift+Delete"
+# toggle_hidden     = "Ctrl+H"
+# toggle_transparency = "Ctrl+Shift+B"
+# quick_preview     = "Space"
+# search            = "Ctrl+F"
+# context_menu      = "Shift+F10"
+# open_terminal     = "Ctrl+Alt+T"
+# properties        = "Alt+Return"
+# path_bar          = "Ctrl+L"
+# toggle_sidebar    = "F9"
+# split_view        = "F3"
+# focus_next_pane   = "F6"
+# focus_previous_pane = "Shift+F6"
+# focus_left_pane   = "Ctrl+Alt+Left"
+# focus_right_pane  = "Ctrl+Alt+Right"
+# grid_view         = "Ctrl+1"
+# miller_view       = "Ctrl+2"
+# detailed_view     = "Ctrl+3"
+# select_all        = "Ctrl+A"
+# undo              = "Ctrl+Z"
+# redo              = "Ctrl+Shift+Z"
+# settings          = "Ctrl+,"
+# edit_config       = "Ctrl+Shift+,"
+# keyboard_shortcuts = "Ctrl+?"
+)");
+}
+
+// First run: give the user the documented file instead of nothing. Every
+// run: refresh the .sample so it documents this version's keys even after
+// the app has rewritten config.toml without comments.
+void ConfigManager::seedDocumentedConfig()
+{
+    if (m_configPath.isEmpty())
+        return;
+    QDir().mkpath(QFileInfo(m_configPath).absolutePath());
+    const QByteArray text = documentedConfigTemplate().toUtf8();
+    if (!QFile::exists(m_configPath)) {
+        QSaveFile config(m_configPath);
+        if (config.open(QIODevice::WriteOnly)) {
+            config.write(text);
+            config.commit();
+        }
+    }
+    QSaveFile sample(m_configPath + ".sample");
+    if (sample.open(QIODevice::WriteOnly)) {
+        sample.write(text);
+        sample.commit();
+    }
 }
 
 QStringList ConfigManager::knownListColumns()

@@ -78,6 +78,10 @@ public:
     QStringList listColumns() const;
     QVariantMap listColumnWidths() const;
     static QStringList knownListColumns();
+    // Fully commented config.toml with every key at its default. Seeded as
+    // the user's config on first run and refreshed as config.toml.sample on
+    // every start (the app rewrites config.toml without comments on save).
+    static QString documentedConfigTemplate();
     // Miller view column widths as fractions of the view: {parent, current};
     // preview takes the rest. Each column keeps at least kMillerMinFraction.
     QVariantMap millerFractions() const;
@@ -154,6 +158,7 @@ private:
     QStringList m_listColumns;
     QVariantMap m_listColumnWidths;
     void setListColumnsNormalized(const QStringList &columns, const QVariantMap &widths);
+    void seedDocumentedConfig();
     double m_millerParent = 0.2;
     double m_millerCurrent = 0.5;
     void setMillerFractionsClamped(double parent, double current);

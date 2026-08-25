@@ -434,26 +434,41 @@ Rectangle {
                     interactive: false   // tabs handle presses; wheel and auto-scroll move the strip
                     clip: true
 
+                    // Scroll position is driven through targetX: contentX has a
+                    // Behavior, so reading it back mid-animation returns a stale
+                    // value and clamping/accumulating on it cancels the move.
+                    property real targetX: 0
+                    function scrollTo(x) {
+                        targetX = Math.max(0, Math.min(x, contentWidth - width))
+                        contentX = targetX
+                    }
                     function ensureTabVisible(index) {
-                        if (index < 0 || tabModel.count === 0) return
+                        // While the bar is hidden (count <= 1) the strip has no
+                        // width; a scroll computed then would stick as a stale
+                        // offset once it opens (first tab cut off, gap on the right).
+                        if (index < 0 || tabModel.count === 0 || width <= 0) return
                         var w = tabRow.width / Math.max(tabModel.count, 1)
                         var left = index * w, right = left + w
-                        if (left < contentX) contentX = left
-                        else if (right > contentX + width) contentX = right - width
+                        var x = targetX
+                        if (left < x) x = left
+                        else if (right > x + width) x = right - width
+                        scrollTo(x)
                     }
+                    onContentWidthChanged: scrollTo(targetX)
                     Connections {
                         target: tabModel
                         function onActiveIndexChanged() { tabStrip.ensureTabVisible(tabModel.activeIndex) }
                         function onCountChanged() { Qt.callLater(function() { tabStrip.ensureTabVisible(tabModel.activeIndex) }) }
                     }
-                    onWidthChanged: ensureTabVisible(tabModel.activeIndex)
+                    onWidthChanged: { scrollTo(targetX); ensureTabVisible(tabModel.activeIndex) }
+                    Component.onCompleted: ensureTabVisible(tabModel.activeIndex)
                     Behavior on contentX { NumberAnimation { duration: Theme.animDurationFast; easing.type: Theme.animEasingTransition; easing.bezierCurve: Theme.animBezierCurve } }
 
                     function scrollByWheel(wheel) {
                         var step = wheel.pixelDelta.x !== 0 ? -wheel.pixelDelta.x
                                  : wheel.pixelDelta.y !== 0 ? -wheel.pixelDelta.y
                                  : -(wheel.angleDelta.y + wheel.angleDelta.x) / 120 * tabRow.minTabWidth
-                        contentX = Math.max(0, Math.min(contentX + step, contentWidth - width))
+                        scrollTo(targetX + step)
                     }
                     // A WheelHandler only takes events on its own axis, so one per
                     // axis: mouse wheel / vertical swipe, and horizontal swipe.
@@ -587,7 +602,10 @@ Rectangle {
                                     ScriptAction {
                                         script: {
                                             tabRow.closingCount = Math.max(tabRow.closingCount - 1, 0)
-                                            tabModel.closeTab(tabDelegate.frozenIndex)
+                                            // Live index: closing another tab meanwhile shifts
+                                            // ours, a frozen index would remove the wrong tab
+                                            // (or none) and leave an invisible zero-width ghost.
+                                            tabModel.closeTab(tabDelegate.index)
                                         }
                                     }
                                 }
