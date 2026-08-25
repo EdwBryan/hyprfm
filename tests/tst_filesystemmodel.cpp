@@ -512,6 +512,30 @@ private slots:
         QVERIFY(!text.isEmpty());
     }
 
+    void testRoleDataExtendedColumns()
+    {
+        TestDir dir;
+        dir.createFile("archive.tar.gz", "data");
+        dir.createSymlink(dir.path() + "/archive.tar.gz", "link");
+
+        FileSystemModel model;
+        model.setSynchronousReload(true);
+        model.setRootPath(dir.path());
+
+        const QModelIndex file = model.index(0);
+        QCOMPARE(model.data(file, FileSystemModel::FileNameRole).toString(), QString("archive.tar.gz"));
+        QCOMPARE(model.data(file, FileSystemModel::FileOwnerRole).toString(), QFileInfo(dir.path()).owner());
+        QCOMPARE(model.data(file, FileSystemModel::FileGroupRole).toString(), QFileInfo(dir.path()).group());
+        QCOMPARE(model.data(file, FileSystemModel::FileExtensionRole).toString(), QString("gz"));
+        QCOMPARE(model.data(file, FileSystemModel::MimeTypeRole).toString(), QString("application/x-compressed-tar"));
+        QVERIFY(!model.data(file, FileSystemModel::FileCreatedTextRole).toString().isEmpty());
+        QVERIFY(!model.data(file, FileSystemModel::FileAccessedTextRole).toString().isEmpty());
+        QCOMPARE(model.data(file, FileSystemModel::SymlinkTargetRole).toString(), QString());
+
+        const QModelIndex link = model.index(1);
+        QCOMPARE(model.data(link, FileSystemModel::SymlinkTargetRole).toString(), dir.path() + "/archive.tar.gz");
+    }
+
     void testRoleDataFilePermissions()
     {
         TestDir dir;
@@ -982,7 +1006,7 @@ private slots:
         model.setSynchronousReload(true);
         auto roles = model.roleNames();
 
-        QCOMPARE(roles.count(), 15);
+        QCOMPARE(roles.count(), 22);
         QCOMPARE(roles[FileSystemModel::FileNameRole],         QByteArray("fileName"));
         QCOMPARE(roles[FileSystemModel::FilePathRole],         QByteArray("filePath"));
         QCOMPARE(roles[FileSystemModel::FileSizeRole],         QByteArray("fileSize"));
@@ -998,6 +1022,13 @@ private slots:
         QCOMPARE(roles[FileSystemModel::GitStatusIconRole],    QByteArray("gitStatusIcon"));
         QCOMPARE(roles[FileSystemModel::HasImagePreviewRole],  QByteArray("hasImagePreview"));
         QCOMPARE(roles[FileSystemModel::HasVideoPreviewRole],  QByteArray("hasVideoPreview"));
+        QCOMPARE(roles[FileSystemModel::FileOwnerRole],        QByteArray("fileOwner"));
+        QCOMPARE(roles[FileSystemModel::FileGroupRole],        QByteArray("fileGroup"));
+        QCOMPARE(roles[FileSystemModel::FileCreatedTextRole],  QByteArray("fileCreatedText"));
+        QCOMPARE(roles[FileSystemModel::FileAccessedTextRole], QByteArray("fileAccessedText"));
+        QCOMPARE(roles[FileSystemModel::FileExtensionRole],    QByteArray("fileExtension"));
+        QCOMPARE(roles[FileSystemModel::MimeTypeRole],         QByteArray("mimeType"));
+        QCOMPARE(roles[FileSystemModel::SymlinkTargetRole],    QByteArray("symlinkTarget"));
     }
 
     // 16. QAbstractItemModelTester

@@ -1,6 +1,10 @@
 import QtQuick
 
-MouseArea {
+// Deliberately not a MouseArea: a MouseArea claims the arrow cursor for its
+// whole area, which silently killed every cursorShape in the views this
+// overlays (column resize grips, pointer hands). A WheelHandler on a plain
+// Item takes wheel events without touching the cursor.
+Item {
     id: root
 
     required property var flickable
@@ -49,9 +53,14 @@ MouseArea {
 
     signal scrollStarted()
 
-    acceptedButtons: Qt.NoButton
-    preventStealing: true
-    scrollGestureEnabled: true
+    WheelHandler {
+        id: wheelHandler
+        acceptedDevices: PointerDevice.Mouse | PointerDevice.TouchPad
+        // `blocking` decides whether the event continues to the Flickable
+        // underneath; handleWheel() flips it per event (the old MouseArea
+        // code toggled wheel.accepted for the same purpose).
+        onWheel: (wheel) => root.handleWheel(wheel)
+    }
 
     function minimumContentY() {
         if (!flickable)
@@ -358,25 +367,26 @@ MouseArea {
         }
     }
 
-    onWheel: (wheel) => {
+    function handleWheel(wheel) {
+        wheelHandler.blocking = true
         if (!enabled || !visible || !flickable || !flickable.visible || !flickable.interactive) {
-            wheel.accepted = false
+            wheelHandler.blocking = false
             return
         }
 
         if (wheel.modifiers !== Qt.NoModifier) {
-            wheel.accepted = false
+            wheelHandler.blocking = false
             return
         }
 
         if (maximumContentY() <= minimumContentY()) {
-            wheel.accepted = false
+            wheelHandler.blocking = false
             return
         }
 
         var delta = deltaFor(wheel)
         if (delta === 0) {
-            wheel.accepted = false
+            wheelHandler.blocking = false
             return
         }
 
@@ -413,7 +423,6 @@ MouseArea {
             kineticCandidate = false
             lastWheelTimestamp = now
             finishTimer.restart()
-            wheel.accepted = true
             return
         }
 
@@ -432,7 +441,6 @@ MouseArea {
         if (wheel.phase === Qt.ScrollEnd)
             finishScroll()
 
-        wheel.accepted = true
     }
 
     Timer {

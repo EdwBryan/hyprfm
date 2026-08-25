@@ -55,6 +55,81 @@ FocusScope {
     readonly property string currentDirName: currentPath ? fileOps.displayNameForPath(currentPath) : ""
 
     property int rowHeight: 28
+
+    // Column widths as fractions of the view (preview takes the rest).
+    // Mirrored from config so both panes agree; dividers update them live
+    // and save on release.
+    property real parentFraction: config.millerFractions.parent
+    property real currentFraction: config.millerFractions.current
+    readonly property real minFraction: 0.12
+    readonly property int parentColumnWidth: Math.floor(width * parentFraction)
+    readonly property int currentColumnWidth: Math.floor(width * currentFraction) - 1
+    Connections {
+        target: config
+        function onMillerFractionsChanged() {
+            root.parentFraction = config.millerFractions.parent
+            root.currentFraction = config.millerFractions.current
+        }
+    }
+
+    // Draggable divider between two Miller columns.
+    component ColumnDivider: Item {
+        id: divider
+        required property bool movesPreview   // false: parent|current, true: current|preview
+        width: 1
+        height: root.height
+        z: 1   // above the neighbouring ListViews so the handle overhang wins
+
+        Rectangle {
+            anchors.fill: parent
+            color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.1)
+        }
+
+        MouseArea {
+            id: handle
+            anchors.horizontalCenter: parent.horizontalCenter
+            width: 10
+            height: parent.height
+            hoverEnabled: true
+            cursorShape: Qt.SizeHorCursor
+            preventStealing: true
+            property real startX: 0
+            property real startParent: 0
+            property real startCurrent: 0
+
+            Rectangle {
+                anchors.centerIn: parent
+                width: 2
+                height: parent.height
+                radius: 1
+                color: Theme.accent
+                opacity: handle.pressed ? 1 : (handle.containsMouse ? 0.7 : 0)
+                Behavior on opacity { NumberAnimation { duration: Theme.animDurationFast } }
+            }
+
+            onPressed: (mouse) => {
+                root.interactionStarted()
+                startX = mapToItem(root, mouse.x, 0).x
+                startParent = root.parentFraction
+                startCurrent = root.currentFraction
+            }
+            onPositionChanged: (mouse) => {
+                if (!pressed || root.width <= 0) return
+                var d = (mapToItem(root, mouse.x, 0).x - startX) / root.width
+                if (divider.movesPreview) {
+                    root.currentFraction = Math.max(root.minFraction,
+                        Math.min(startCurrent + d, 1 - root.parentFraction - root.minFraction))
+                } else {
+                    // parent|current line: preview keeps its width
+                    var pair = startParent + startCurrent
+                    root.parentFraction = Math.max(root.minFraction,
+                        Math.min(startParent + d, pair - root.minFraction))
+                    root.currentFraction = pair - root.parentFraction
+                }
+            }
+            onReleased: config.saveMillerFractions(root.parentFraction, root.currentFraction)
+        }
+    }
     readonly property int minRowHeight: 22
     readonly property int maxRowHeight: 56
     readonly property int millerIconSize: Math.round(rowHeight * 0.571)  // 16 at default 28
@@ -168,7 +243,8 @@ FocusScope {
         // ── Parent column (20%) ───────────────────────────────────────────
         ListView {
             id: parentColumn
-            width: Math.floor(root.width * 0.2)
+            objectName: "millerParentColumn"
+            width: root.parentColumnWidth
             height: root.height
             clip: true
             reuseItems: true
@@ -339,16 +415,13 @@ FocusScope {
             }
         }
 
-        Rectangle {
-            width: 1
-            height: root.height
-            color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.1)
-        }
+        ColumnDivider { objectName: "millerDivider_left"; movesPreview: false }
 
         // ── Current column (50%) ─────────────────────────────────────────
         ListView {
             id: currentColumn
-            width: Math.floor(root.width * 0.5) - 1
+            objectName: "millerCurrentColumn"
+            width: root.currentColumnWidth
             height: root.height
             clip: true
             reuseItems: true
@@ -1136,16 +1209,13 @@ FocusScope {
             }
         }
 
-        Rectangle {
-            width: 1
-            height: root.height
-            color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.1)
-        }
+        ColumnDivider { objectName: "millerDivider_right"; movesPreview: true }
 
         // ── Preview column (30%) ─────────────────────────────────────────
         Item {
             id: previewColumn
-            width: root.width - Math.floor(root.width * 0.2) - Math.floor(root.width * 0.5) - 1
+            objectName: "millerPreviewColumn"
+            width: root.width - root.parentColumnWidth - root.currentColumnWidth - 2
             height: root.height
             clip: true
 

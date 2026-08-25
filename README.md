@@ -282,6 +282,20 @@ radius_small = 4
 radius_medium = 8
 radius_large = 12
 
+[list_view]
+# Columns in the detailed view, in display order ("name" is always first).
+# Right-click the header to toggle columns, drag headers to reorder, drag a
+# header's right edge to resize. Available: size, modified, type, permissions,
+# owner, group, created, accessed, extension, mime, git, symlink
+columns = ["name", "size", "modified", "type"]
+column_widths = { size = 110, modified = 140, type = 80 }
+
+[miller_view]
+# Column widths as fractions of the view; the preview column takes the rest.
+# Drag the lines between columns to change them (each keeps at least 12%).
+parent_fraction = 0.2
+current_fraction = 0.5
+
 [bookmarks]
 paths = ["~/Documents", "~/Downloads", "~/Pictures", "~/Projects"]
 

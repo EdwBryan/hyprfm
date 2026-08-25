@@ -260,6 +260,8 @@ void ConfigManager::setDefaults()
     m_dependencyStartupCheck = true;
     m_sidebarVisible = true;
     m_hiddenQuickAccess.clear();
+    setListColumnsNormalized({}, {});
+    setMillerFractionsClamped(0.2, 0.5);
     m_bookmarks = defaultBookmarkPaths();
     m_radiusSmall = 4;
     m_radiusMedium = 8;
@@ -336,6 +338,33 @@ void ConfigManager::loadConfig()
                 if (auto v = item.value<std::string>())
                     m_hiddenQuickAccess.append(QString::fromStdString(*v));
             }
+        }
+
+        // Detailed view columns
+        if (auto arr = config["list_view"]["columns"].as_array()) {
+            QStringList columns;
+            for (const auto &item : *arr) {
+                if (auto v = item.value<std::string>())
+                    columns.append(QString::fromStdString(*v));
+            }
+            QVariantMap widths;
+            if (auto tbl = config["list_view"]["column_widths"].as_table()) {
+                for (const auto &[key, value] : *tbl) {
+                    if (auto w = value.value<int64_t>())
+                        widths.insert(QString::fromStdString(std::string(key.str())), static_cast<int>(*w));
+                }
+            }
+            setListColumnsNormalized(columns, widths);
+        }
+
+        // Miller view column widths
+        {
+            double parent = m_millerParent, current = m_millerCurrent;
+            if (auto v = config["miller_view"]["parent_fraction"].value<double>())
+                parent = *v;
+            if (auto v = config["miller_view"]["current_fraction"].value<double>())
+                current = *v;
+            setMillerFractionsClamped(parent, current);
         }
 
         // Appearance
@@ -419,6 +448,130 @@ void ConfigManager::loadConfig()
     } catch (const toml::parse_error &err) {
         qWarning() << "Config parse error:" << err.what();
     }
+    emit listColumnsChanged();
+    emit millerFractionsChanged();
+}
+
+// Keeps every Miller column at least kMillerMinFraction wide: parent first,
+// then current, then whatever is left must still fit the preview column.
+void ConfigManager::setMillerFractionsClamped(double parent, double current)
+{
+    const double minF = kMillerMinFraction;
+    parent = qBound(minF, parent, 1.0 - 2 * minF);
+    current = qBound(minF, current, 1.0 - minF - parent);
+    m_millerParent = parent;
+    m_millerCurrent = current;
+}
+
+QVariantMap ConfigManager::millerFractions() const
+{
+    return {{"parent", m_millerParent}, {"current", m_millerCurrent}};
+}
+
+void ConfigManager::saveMillerFractions(double parent, double current)
+{
+    setMillerFractionsClamped(parent, current);
+
+    const bool wasWatchingConfig = m_watcher.files().contains(m_configPath);
+    if (wasWatchingConfig)
+        m_watcher.removePath(m_configPath);
+
+    toml::table config;
+    if (QFile::exists(m_configPath)) {
+        try {
+            config = toml::parse_file(m_configPath.toStdString());
+        } catch (...) {}
+    }
+    config.insert_or_assign("miller_view", toml::table{{"parent_fraction", m_millerParent},
+                                                       {"current_fraction", m_millerCurrent}});
+
+    std::ofstream ofs(m_configPath.toStdString());
+    if (ofs.is_open()) {
+        ofs << config;
+        ofs.close();
+    }
+
+    if (QFile::exists(m_configPath)) {
+        m_configModified = QFileInfo(m_configPath).lastModified();
+        m_watcher.addPath(m_configPath);
+    }
+    emit millerFractionsChanged();
+}
+
+QStringList ConfigManager::knownListColumns()
+{
+    return {"name", "size", "modified", "type", "permissions", "owner", "group",
+            "created", "accessed", "extension", "mime", "git", "symlink"};
+}
+
+// Drops unknown/duplicate keys, keeps "name" present, fills every width with
+// a default and clamps to the minimum the view can render.
+void ConfigManager::setListColumnsNormalized(const QStringList &columns, const QVariantMap &widths)
+{
+    static const QVariantMap defaultWidths {
+        {"size", 110}, {"modified", 140}, {"type", 80}, {"permissions", 90},
+        {"owner", 90}, {"group", 90}, {"created", 140}, {"accessed", 140},
+        {"extension", 70}, {"mime", 160}, {"git", 70}, {"symlink", 180},
+    };
+    constexpr int kMinWidth = 40;
+    const QStringList known = knownListColumns();
+
+    QStringList normalized;
+    for (const QString &c : columns) {
+        if (known.contains(c) && !normalized.contains(c))
+            normalized.append(c);
+    }
+    if (!normalized.contains("name"))
+        normalized.prepend("name");
+    if (normalized.size() == 1)
+        normalized = {"name", "size", "modified", "type"};
+    m_listColumns = normalized;
+
+    m_listColumnWidths = defaultWidths;
+    for (auto it = widths.constBegin(); it != widths.constEnd(); ++it) {
+        if (defaultWidths.contains(it.key()))
+            m_listColumnWidths[it.key()] = qMax(kMinWidth, it.value().toInt());
+    }
+}
+
+QStringList ConfigManager::listColumns() const { return m_listColumns; }
+QVariantMap ConfigManager::listColumnWidths() const { return m_listColumnWidths; }
+
+void ConfigManager::saveListColumns(const QStringList &columns, const QVariantMap &widths)
+{
+    setListColumnsNormalized(columns, widths);
+
+    const bool wasWatchingConfig = m_watcher.files().contains(m_configPath);
+    if (wasWatchingConfig)
+        m_watcher.removePath(m_configPath);
+
+    toml::table config;
+    if (QFile::exists(m_configPath)) {
+        try {
+            config = toml::parse_file(m_configPath.toStdString());
+        } catch (...) {}
+    }
+
+    toml::array cols;
+    for (const QString &c : m_listColumns)
+        cols.push_back(c.toStdString());
+    toml::table widthTable;
+    for (auto it = m_listColumnWidths.constBegin(); it != m_listColumnWidths.constEnd(); ++it)
+        widthTable.insert_or_assign(it.key().toStdString(), static_cast<int64_t>(it.value().toInt()));
+    config.insert_or_assign("list_view", toml::table{{"columns", std::move(cols)},
+                                                     {"column_widths", std::move(widthTable)}});
+
+    std::ofstream ofs(m_configPath.toStdString());
+    if (ofs.is_open()) {
+        ofs << config;
+        ofs.close();
+    }
+
+    if (QFile::exists(m_configPath)) {
+        m_configModified = QFileInfo(m_configPath).lastModified();
+        m_watcher.addPath(m_configPath);
+    }
+    emit listColumnsChanged();
 }
 
 QString ConfigManager::theme() const { return m_theme; }

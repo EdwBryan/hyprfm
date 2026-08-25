@@ -354,17 +354,287 @@ FocusScope {
         root.sortRequested(sortColumn, sortAscending)
     }
 
-    // Column widths
-    readonly property int colName: root.width - colSize - colModified - colType
-    readonly property int colSize: 110
-    readonly property int colModified: 140
-    readonly property int colType: 80
+    // Columns. Keys and defaults live in ConfigManager::knownListColumns();
+    // this table only adds what the view needs to draw them.
+    readonly property var columnCatalog: ({
+        name:        { label: "Name",        role: "fileName",         align: Text.AlignLeft,  sortable: true },
+        size:        { label: "Size",        role: "fileSizeText",     align: Text.AlignRight, sortable: true },
+        modified:    { label: "Modified",    role: "fileModifiedText", align: Text.AlignRight, sortable: true },
+        type:        { label: "Type",        role: "fileType",         align: Text.AlignLeft,  sortable: true },
+        permissions: { label: "Permissions", role: "filePermissions",  align: Text.AlignLeft,  sortable: false },
+        owner:       { label: "Owner",       role: "fileOwner",        align: Text.AlignLeft,  sortable: false },
+        group:       { label: "Group",       role: "fileGroup",        align: Text.AlignLeft,  sortable: false },
+        created:     { label: "Created",     role: "fileCreatedText",  align: Text.AlignRight, sortable: false },
+        accessed:    { label: "Accessed",    role: "fileAccessedText", align: Text.AlignRight, sortable: false },
+        extension:   { label: "Ext",         role: "fileExtension",    align: Text.AlignLeft,  sortable: false },
+        mime:        { label: "MIME type",   role: "mimeType",         align: Text.AlignLeft,  sortable: false },
+        git:         { label: "Git",         role: "gitStatus",        align: Text.AlignLeft,  sortable: false },
+        symlink:     { label: "Link target", role: "symlinkTarget",    align: Text.AlignLeft,  sortable: false }
+    })
+    // Display order and widths, mirrored from config so both panes stay in sync
+    // and drags can update them live before saving on release.
+    property var columns: config.listColumns
+    property var columnWidths: config.listColumnWidths
+    readonly property int minColumnWidth: 40
+    readonly property int fixedColumnsWidth: {
+        var total = 0
+        for (var i = 0; i < columns.length; ++i)
+            if (columns[i] !== "name")
+                total += columnWidth(columns[i])
+        return total
+    }
+    readonly property int colName: Math.max(120, root.width - 16 - fixedColumnsWidth)
+    // Header drag state (index of the column being moved, -1 when idle).
+    property int dragSourceIndex: -1
+    // Only reorders and toggles animate; resizes and the initial layout snap,
+    // otherwise cells lag behind the grip while dragging.
+    readonly property bool animateColumns: dragSourceIndex >= 0 || columnsAnimTimer.running
+    Timer { id: columnsAnimTimer; interval: Theme.animDuration + 50 }
 
-    Column {
+    // Header and row cells iterate this model instead of the array so a
+    // reorder is a ListModel.move(): delegates survive and the Row's move
+    // transition animates them into place.
+    ListModel { id: columnModel }
+
+    onColumnsChanged: syncColumnModel()
+    Component.onCompleted: syncColumnModel()
+
+    function syncColumnModel() {
+        var current = []
+        for (var i = 0; i < columnModel.count; ++i)
+            current.push(columnModel.get(i).key)
+        // remove what is gone
+        for (i = current.length - 1; i >= 0; --i) {
+            if (columns.indexOf(current[i]) < 0) {
+                columnModel.remove(i)
+                current.splice(i, 1)
+            }
+        }
+        // insert what is new, then fix the order with moves
+        for (i = 0; i < columns.length; ++i) {
+            var at = current.indexOf(columns[i])
+            if (at < 0) {
+                columnModel.insert(i, { key: columns[i] })
+                current.splice(i, 0, columns[i])
+            } else if (at !== i) {
+                columnModel.move(at, i, 1)
+                current.splice(i, 0, current.splice(at, 1)[0])
+            }
+        }
+    }
+
+    function columnWidth(key) {
+        if (key === "name")
+            return colName
+        var w = columnWidths[key]
+        return w === undefined ? 80 : w
+    }
+    function setColumnWidth(key, width) {
+        var w = Object.assign({}, columnWidths)
+        w[key] = Math.max(minColumnWidth, Math.round(width))
+        columnWidths = w
+    }
+    function moveColumn(from, to) {
+        if (from < 0 || to < 0 || from === to || to >= columns.length) return
+        var arr = columns.slice()
+        var key = arr.splice(from, 1)[0]
+        arr.splice(to, 0, key)
+        columns = arr
+    }
+    function toggleColumn(key, on) {
+        var arr = columns.filter(function(k) { return k !== key })
+        if (on) arr.push(key)
+        columnsAnimTimer.restart()
+        columns = arr
+        saveColumns()
+    }
+    function saveColumns() {
+        config.saveListColumns(columns, columnWidths)
+    }
+    // Header x → index of the column slot under it (for reorder).
+    function columnIndexAt(x) {
+        var acc = 0
+        for (var i = 0; i < columns.length; ++i) {
+            var w = columnWidth(columns[i])
+            if (x < acc + w) return i
+            acc += w
+        }
+        return columns.length - 1
+    }
+    function cellText(key, row) {
+        if (key === "size" && row.isDir) {
+            var cnt = root.folderItemCounts[row.filePath]
+            if (cnt !== undefined)
+                return cnt + (cnt === 1 ? " item" : " items")
+            return "\u2014"
+        }
+        var value = row.model[columnCatalog[key].role]
+        return value === undefined || value === null ? "" : String(value)
+    }
+
+    Connections {
+        target: config
+        function onListColumnsChanged() {
+            root.columns = config.listColumns
+            root.columnWidths = config.listColumnWidths
+        }
+    }
+
+    // Right-click on the header: pick which columns to show. Same look and
+    // entrance as ContextMenu, one row per optional column.
+    Item {
+        id: columnMenu
         anchors.fill: parent
+        visible: false
+        z: 50
+
+        function openAt(px, py) {
+            menuBox.x = Math.max(0, Math.min(px, root.width - menuBox.width))
+            menuBox.y = Math.max(0, Math.min(py, root.height - menuBox.height))
+            menuBox.opacity = 0
+            menuBox.scale = 0.88
+            visible = true
+            menuOpenAnim.restart()
+        }
+        function close() { menuCloseAnim.restart() }
+
+        MouseArea {
+            anchors.fill: parent
+            acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
+            onPressed: columnMenu.close()
+        }
+
+        ParallelAnimation {
+            id: menuOpenAnim
+            NumberAnimation {
+                target: menuBox; property: "opacity"; from: 0; to: 1; duration: Theme.animDurationFast
+                easing.type: Theme.animEasingEnter; easing.bezierCurve: Theme.animBezierCurve
+            }
+            NumberAnimation {
+                target: menuBox; property: "scale"; from: 0.88; to: 1; duration: Theme.animDurationSlow
+                easing.type: Easing.OutBack; easing.overshoot: 0.8
+            }
+            NumberAnimation {
+                target: menuBox; property: "yOffset"; from: -8; to: 0; duration: Theme.animDuration
+                easing.type: Theme.animEasingEnter; easing.bezierCurve: Theme.animBezierCurve
+            }
+        }
+        SequentialAnimation {
+            id: menuCloseAnim
+            ParallelAnimation {
+                NumberAnimation {
+                    target: menuBox; property: "opacity"; to: 0; duration: Theme.animDurationFast
+                    easing.type: Theme.animEasingExit; easing.bezierCurve: Theme.animBezierCurve
+                }
+                NumberAnimation {
+                    target: menuBox; property: "scale"; to: 0.92; duration: Theme.animDurationFast
+                    easing.type: Theme.animEasingExit; easing.bezierCurve: Theme.animBezierCurve
+                }
+                NumberAnimation {
+                    target: menuBox; property: "yOffset"; to: -4; duration: Theme.animDurationFast
+                    easing.type: Theme.animEasingExit; easing.bezierCurve: Theme.animBezierCurve
+                }
+            }
+            ScriptAction { script: columnMenu.visible = false }
+        }
+
+        Item {
+            id: menuBox
+            width: menuColumn.width + 12
+            height: menuColumn.height + 12
+            opacity: 0
+            scale: 0.88
+            transformOrigin: Item.TopLeft
+            property real yOffset: 0
+            transform: Translate { y: menuBox.yOffset }
+
+            Rectangle {
+                anchors.fill: parent
+                radius: Theme.radiusLarge
+                color: Theme.crust
+                border.color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08)
+                border.width: 1
+            }
+
+            Column {
+                id: menuColumn
+                anchors.centerIn: parent
+                width: 200
+                spacing: 2
+
+                Repeater {
+                    model: Object.keys(root.columnCatalog).filter(function(k) { return k !== "name" })
+                    delegate: Rectangle {
+                        required property string modelData
+                        readonly property bool shown: root.columns.indexOf(modelData) >= 0
+                        objectName: "columnMenuItem_" + modelData
+                        width: menuColumn.width
+                        height: 32
+                        radius: Theme.radiusMedium
+                        color: itemMa.containsMouse
+                            ? Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.1)
+                            : "transparent"
+                        Behavior on color {
+                            ColorAnimation { duration: 100; easing.type: Theme.animEasingEnter; easing.bezierCurve: Theme.animBezierCurve }
+                        }
+                        Row {
+                            anchors.fill: parent
+                            anchors.leftMargin: 12
+                            anchors.rightMargin: 12
+                            spacing: 8
+                            IconCheck {
+                                anchors.verticalCenter: parent.verticalCenter
+                                size: 16
+                                color: Theme.accent
+                                opacity: shown ? 1 : 0
+                                Behavior on opacity { NumberAnimation { duration: Theme.animDurationFast } }
+                            }
+                            Text {
+                                anchors.verticalCenter: parent.verticalCenter
+                                text: root.columnCatalog[modelData].label
+                                font.pointSize: Theme.fontNormal
+                                color: Theme.text
+                            }
+                        }
+                        MouseArea {
+                            id: itemMa
+                            anchors.fill: parent
+                            hoverEnabled: true
+                            cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                root.toggleColumn(modelData, !shown)
+                                columnMenu.close()
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    Item {
+        anchors.fill: parent
+
+        // Wheel scroller sits between the list and the header. As a MouseArea
+        // it claims the arrow cursor for everything under it, so the header
+        // (pointer + resize cursors) must be a sibling stacked above it.
+        KineticWheelScroller {
+            id: wheelScroller
+            anchors.fill: parent
+            z: 12
+            flickable: listView
+            wheelStep: 42
+            mouseWheelMultiplier: 0.75
+            touchpadMultiplier: 1.35
+            minVelocity: 135
+            maxVelocity: 3900
+            kineticGain: 1.01
+            onScrollStarted: root.interactionStarted()
+        }
 
         // Header row
         Rectangle {
+            z: 13
             width: root.width
             height: root.rowHeight
             color: Theme.mantle
@@ -384,26 +654,40 @@ FocusScope {
                 anchors.leftMargin: 8
                 anchors.rightMargin: 8
                 spacing: 0
+                move: Transition {
+                    enabled: root.animateColumns
+                    NumberAnimation { properties: "x"; duration: Theme.animDuration; easing.type: Theme.animEasingTransition; easing.bezierCurve: Theme.animBezierCurve }
+                }
+                add: Transition {
+                    NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Theme.animDuration }
+                }
 
                 Repeater {
-                    model: [
-                        { key: "name",     label: "Name",        width: root.colName },
-                        { key: "size",     label: "Size",        width: root.colSize },
-                        { key: "modified", label: "Modified",    width: root.colModified },
-                        { key: "type",     label: "Type",        width: root.colType }
-                    ]
+                    model: columnModel
 
                     delegate: Item {
-                        width: modelData.width
+                        id: hdrItem
+                        required property int index
+                        required property string key
+                        readonly property var spec: root.columnCatalog[key]
+                        readonly property bool fills: key === "name"   // takes the remaining width, no grip
+                        objectName: "headerColumn_" + key
+                        width: root.columnWidth(key)
                         height: 28
+                        // Earlier columns stack above later ones so a grip can
+                        // straddle the boundary without the neighbour eating it.
+                        z: 100 - index
 
                         Rectangle {
                             anchors.fill: parent
-                            color: hdrMa.containsMouse
-                                ? Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.07)
-                                : "transparent"
+                            color: root.dragSourceIndex === hdrItem.index
+                                ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.18)
+                                : hdrMa.containsMouse
+                                    ? Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.07)
+                                    : "transparent"
                             Behavior on color { ColorAnimation { duration: Theme.animDuration } }
                         }
+
 
                         Row {
                             anchors.verticalCenter: parent.verticalCenter
@@ -412,15 +696,15 @@ FocusScope {
                             spacing: 3
 
                             Text {
-                                text: modelData.label
-                                color: root.sortColumn === modelData.key ? Theme.accent : Theme.subtext
+                                text: hdrItem.spec.label
+                                color: root.sortColumn === hdrItem.key ? Theme.accent : Theme.subtext
                                 font.pointSize: Theme.fontSmall
-                                font.bold: root.sortColumn === modelData.key
+                                font.bold: root.sortColumn === hdrItem.key
                                 anchors.verticalCenter: parent.verticalCenter
                             }
 
                             IconChevronDown {
-                                visible: root.sortColumn === modelData.key
+                                visible: hdrItem.spec.sortable && root.sortColumn === hdrItem.key
                                 size: 12
                                 color: Theme.accent
                                 rotation: root.sortAscending ? 180 : 0
@@ -444,15 +728,99 @@ FocusScope {
 
                         MouseArea {
                             id: hdrMa
+                            objectName: "headerArea_" + hdrItem.key
                             anchors.fill: parent
                             hoverEnabled: true
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
                             cursorShape: Qt.PointingHandCursor
-                            onPressed: {
+                            property real pressX: 0
+                            property bool dragging: false
+                            onPressed: (mouse) => {
                                 wheelScroller.stopAndSettle()
                                 root.interactionStarted()
                                 listView.forceActiveFocus()
+                                if (mouse.button === Qt.RightButton) {
+                                    var pt = mapToItem(root, mouse.x, mouse.y)
+                                    columnMenu.openAt(pt.x, pt.y)
+                                    return
+                                }
+                                pressX = mouse.x
+                                dragging = false
                             }
-                            onClicked: root.clickHeader(modelData.key)
+                            onPositionChanged: (mouse) => {
+                                if (!pressed || mouse.buttons !== Qt.LeftButton) return
+                                if (!dragging && Math.abs(mouse.x - pressX) < 4) return
+                                dragging = true
+                                root.dragSourceIndex = hdrItem.index
+                                // Live reorder: pointer position in header coordinates picks
+                                // the slot; the model move keeps this delegate alive.
+                                var headerX = mapToItem(hdrItem.parent, mouse.x, 0).x
+                                var target = Math.max(0, root.columnIndexAt(headerX))
+                                if (target !== hdrItem.index)
+                                    root.moveColumn(hdrItem.index, target)
+                            }
+                            onReleased: (mouse) => {
+                                if (mouse.button !== Qt.LeftButton) return
+                                var wasDragging = dragging
+                                dragging = false
+                                root.dragSourceIndex = -1
+                                if (wasDragging)
+                                    root.saveColumns()
+                                else if (hdrItem.spec.sortable && containsMouse)
+                                    root.clickHeader(hdrItem.key)
+                            }
+                            onCanceled: { root.dragSourceIndex = -1; dragging = false }
+                        }
+
+                        // Resize grip straddling this column's right boundary.
+                        // Name soaks up whatever width the others leave, so the
+                        // line under the cursor only follows the cursor if we
+                        // resize the neighbour on the side *away* from Name:
+                        // Name at/left of the line → shrink the right column by
+                        // dx; Name to the right → grow the left column by dx.
+                        MouseArea {
+                            objectName: "headerGrip_" + hdrItem.key
+                            readonly property bool fillOnLeft: root.columns.indexOf("name") <= hdrItem.index
+                            readonly property string targetKey: fillOnLeft
+                                ? (hdrItem.index + 1 < columnModel.count ? columnModel.get(hdrItem.index + 1).key : "")
+                                : hdrItem.key
+                            readonly property int direction: fillOnLeft ? -1 : 1
+                            visible: targetKey !== ""
+                            anchors.right: parent.right
+                            anchors.rightMargin: -6
+                            anchors.top: parent.top
+                            anchors.bottom: parent.bottom
+                            width: 12
+                            hoverEnabled: true
+                            cursorShape: Qt.SizeHorCursor
+                            preventStealing: true
+                            property real startX: 0
+                            property int startWidth: 0
+
+                            // Boundary highlight so it is obvious what you are grabbing
+                            Rectangle {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                anchors.top: parent.top
+                                anchors.bottom: parent.bottom
+                                anchors.topMargin: 2
+                                anchors.bottomMargin: 2
+                                width: 2
+                                radius: 1
+                                color: Theme.accent
+                                opacity: parent.pressed ? 1 : (parent.containsMouse ? 0.7 : 0)
+                                Behavior on opacity { NumberAnimation { duration: Theme.animDurationFast } }
+                            }
+                            onPressed: (mouse) => {
+                                root.interactionStarted()
+                                startX = mapToItem(root, mouse.x, 0).x
+                                startWidth = root.columnWidth(targetKey)
+                            }
+                            onPositionChanged: (mouse) => {
+                                if (!pressed) return
+                                var dx = mapToItem(root, mouse.x, 0).x - startX
+                                root.setColumnWidth(targetKey, startWidth + direction * dx)
+                            }
+                            onReleased: root.saveColumns()
                         }
                     }
                 }
@@ -470,6 +838,8 @@ FocusScope {
         // File list
         ListView {
             id: listView
+            objectName: "listView"
+            y: root.rowHeight
             width: root.width
             height: root.height - root.rowHeight
             clip: true
@@ -612,6 +982,7 @@ FocusScope {
                 Accessible.selected: isSelected
 
                 required property int index
+                required property var model
                 required property string fileName
                 required property string filePath
                 required property var fileModified
@@ -630,6 +1001,149 @@ FocusScope {
                 readonly property bool isPastePending: fileOps.pendingTargetPaths.indexOf(detRow.filePath) >= 0
 
                 property bool dragStarted: false
+
+                            // Row cells, one Loader per column. `key` is the Loader's required
+                            // property (visible to the loaded item as its context object);
+                            // detRow is in scope because the components live in the delegate.
+                Component {
+                    id: nameCellComponent
+                    Row {
+                        anchors.fill: parent
+                        spacing: 6
+
+                        // Icon with git badge
+                        Item {
+                            width: root.detailIconSize
+                            height: root.detailIconSize
+                            anchors.verticalCenter: parent.verticalCenter
+
+                            readonly property bool hasThumbnail: !fileOps.isRemotePath(detRow.filePath)
+                                && (detRow.hasImagePreview || detRow.hasVideoPreview)
+
+                            Image {
+                                anchors.fill: parent
+                                visible: !parent.hasThumbnail
+                                source: "image://icon/" + detRow.fileIconName + "?theme=" + config.iconTheme + "&builtin=" + (config.builtinIcons ? "1" : "0")
+                                sourceSize: Qt.size(root.detailIconSize, root.detailIconSize)
+                                asynchronous: true
+                            }
+
+                            Image {
+                                anchors.fill: parent
+                                visible: parent.hasThumbnail
+                                fillMode: Image.PreserveAspectFit
+                                source: parent.hasThumbnail
+                                    ? ("image://thumbnail/" + detRow.filePath
+                                       + "?mtime=" + new Date(detRow.fileModified).getTime())
+                                    : ""
+                                sourceSize: Qt.size(64 * Screen.devicePixelRatio, 64 * Screen.devicePixelRatio)
+                                asynchronous: true
+                            }
+
+                            Rectangle {
+                                anchors.top: parent.top
+                                anchors.right: parent.right
+                                anchors.topMargin: -3
+                                anchors.rightMargin: -3
+                                width: 12
+                                height: 12
+                                radius: 6
+                                z: 2
+                                color: Qt.rgba(Theme.mantle.r, Theme.mantle.g, Theme.mantle.b, 0.96)
+                                border.width: 1
+                                border.color: Qt.rgba(Theme.warning.r, Theme.warning.g, Theme.warning.b, 0.9)
+                                opacity: detRow.isCutPending ? 1 : 0
+                                scale: detRow.isCutPending ? 1 : 0.88
+                                visible: opacity > 0
+
+                                Behavior on opacity { NumberAnimation { duration: Theme.animDurationFast; easing.type: Theme.animEasingEnter; easing.bezierCurve: Theme.animBezierCurve } }
+                                Behavior on scale { NumberAnimation { duration: Theme.animDurationFast; easing.type: Theme.animEasingEnter; easing.bezierCurve: Theme.animBezierCurve } }
+
+                                IconScissors {
+                                    anchors.centerIn: parent
+                                    size: 7
+                                    color: Theme.warning
+                                }
+                            }
+
+                            Rectangle {
+                                anchors.centerIn: parent
+                                width: 16
+                                height: 16
+                                radius: 8
+                                z: 3
+                                color: Qt.rgba(Theme.mantle.r, Theme.mantle.g, Theme.mantle.b, 0.92)
+                                border.width: 1
+                                border.color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.35)
+                                opacity: detRow.isPastePending ? 1 : 0
+                                scale: detRow.isPastePending ? 1 : 0.9
+                                visible: opacity > 0
+
+                                Behavior on opacity { NumberAnimation { duration: Theme.animDurationFast; easing.type: Theme.animEasingEnter; easing.bezierCurve: Theme.animBezierCurve } }
+                                Behavior on scale { NumberAnimation { duration: Theme.animDurationFast; easing.type: Theme.animEasingEnter; easing.bezierCurve: Theme.animBezierCurve } }
+
+                                Q.Spinner {
+                                    anchors.centerIn: parent
+                                    size: "small"
+                                    color: Theme.accent
+                                    running: detRow.isPastePending
+                                    scale: 0.6
+                                }
+                            }
+
+                            Loader {
+                                active: detRow.gitStatus !== ""
+                                anchors.right: parent.right
+                                anchors.bottom: parent.bottom
+                                anchors.rightMargin: -3
+                                anchors.bottomMargin: -3
+                                width: 9
+                                height: 9
+                                sourceComponent: {
+                                    switch (detRow.gitStatusIcon) {
+                                        case "git-modified":   return gitModifiedIcon
+                                        case "git-staged":     return gitStagedIcon
+                                        case "git-untracked":  return gitUntrackedIcon
+                                        case "git-deleted":    return gitDeletedIcon
+                                        case "git-renamed":    return gitRenamedIcon
+                                        case "git-conflicted": return gitConflictedIcon
+                                        case "git-ignored":    return gitIgnoredIcon
+                                        case "git-dirty":      return gitDirtyIcon
+                                        default: return null
+                                    }
+                                }
+                            }
+                        }
+
+                        Text {
+                            width: root.colName - 20
+                            anchors.verticalCenter: parent.verticalCenter
+                            textFormat: Text.PlainText
+                            text: detRow.fileName
+                            color: Theme.text
+                            font.pointSize: Theme.fontSmall
+                            elide: Text.ElideRight
+                        }
+                    }
+                }
+
+                Component {
+                    id: textCellComponent
+                    Text {
+                        anchors.fill: parent
+                        verticalAlignment: Text.AlignVCenter
+                        textFormat: Text.PlainText
+                        text: root.cellText(key, detRow)
+                        color: Theme.subtext
+                        font.pointSize: Theme.fontSmall
+                        elide: Text.ElideRight
+                        horizontalAlignment: root.columnCatalog[key].align
+                        rightPadding: 8
+                        leftPadding: 4
+                    }
+                }
+
+
 
                 DropArea {
                     id: folderDropArea
@@ -675,167 +1189,22 @@ FocusScope {
                         anchors.leftMargin: 8
                         anchors.rightMargin: 8
                         spacing: 0
-
-                        // Name
-                        Row {
-                            width: root.colName
-                            height: parent.height
-                            spacing: 6
-
-                            // Icon with git badge
-                            Item {
-                                width: root.detailIconSize
-                                height: root.detailIconSize
-                                anchors.verticalCenter: parent.verticalCenter
-
-                                readonly property bool hasThumbnail: !fileOps.isRemotePath(detRow.filePath)
-                                    && (detRow.hasImagePreview || detRow.hasVideoPreview)
-
-                                Image {
-                                    anchors.fill: parent
-                                    visible: !parent.hasThumbnail
-                                    source: "image://icon/" + detRow.fileIconName + "?theme=" + config.iconTheme + "&builtin=" + (config.builtinIcons ? "1" : "0")
-                                    sourceSize: Qt.size(root.detailIconSize, root.detailIconSize)
-                                    asynchronous: true
-                                }
-
-                                Image {
-                                    anchors.fill: parent
-                                    visible: parent.hasThumbnail
-                                    fillMode: Image.PreserveAspectFit
-                                    source: parent.hasThumbnail
-                                        ? ("image://thumbnail/" + detRow.filePath
-                                           + "?mtime=" + new Date(detRow.fileModified).getTime())
-                                        : ""
-                                    sourceSize: Qt.size(64 * Screen.devicePixelRatio, 64 * Screen.devicePixelRatio)
-                                    asynchronous: true
-                                }
-
-                                Rectangle {
-                                    anchors.top: parent.top
-                                    anchors.right: parent.right
-                                    anchors.topMargin: -3
-                                    anchors.rightMargin: -3
-                                    width: 12
-                                    height: 12
-                                    radius: 6
-                                    z: 2
-                                    color: Qt.rgba(Theme.mantle.r, Theme.mantle.g, Theme.mantle.b, 0.96)
-                                    border.width: 1
-                                    border.color: Qt.rgba(Theme.warning.r, Theme.warning.g, Theme.warning.b, 0.9)
-                                    opacity: detRow.isCutPending ? 1 : 0
-                                    scale: detRow.isCutPending ? 1 : 0.88
-                                    visible: opacity > 0
-
-                                    Behavior on opacity { NumberAnimation { duration: Theme.animDurationFast; easing.type: Theme.animEasingEnter; easing.bezierCurve: Theme.animBezierCurve } }
-                                    Behavior on scale { NumberAnimation { duration: Theme.animDurationFast; easing.type: Theme.animEasingEnter; easing.bezierCurve: Theme.animBezierCurve } }
-
-                                    IconScissors {
-                                        anchors.centerIn: parent
-                                        size: 7
-                                        color: Theme.warning
-                                    }
-                                }
-
-                                Rectangle {
-                                    anchors.centerIn: parent
-                                    width: 16
-                                    height: 16
-                                    radius: 8
-                                    z: 3
-                                    color: Qt.rgba(Theme.mantle.r, Theme.mantle.g, Theme.mantle.b, 0.92)
-                                    border.width: 1
-                                    border.color: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.35)
-                                    opacity: detRow.isPastePending ? 1 : 0
-                                    scale: detRow.isPastePending ? 1 : 0.9
-                                    visible: opacity > 0
-
-                                    Behavior on opacity { NumberAnimation { duration: Theme.animDurationFast; easing.type: Theme.animEasingEnter; easing.bezierCurve: Theme.animBezierCurve } }
-                                    Behavior on scale { NumberAnimation { duration: Theme.animDurationFast; easing.type: Theme.animEasingEnter; easing.bezierCurve: Theme.animBezierCurve } }
-
-                                    Q.Spinner {
-                                        anchors.centerIn: parent
-                                        size: "small"
-                                        color: Theme.accent
-                                        running: detRow.isPastePending
-                                        scale: 0.6
-                                    }
-                                }
-
-                                Loader {
-                                    active: detRow.gitStatus !== ""
-                                    anchors.right: parent.right
-                                    anchors.bottom: parent.bottom
-                                    anchors.rightMargin: -3
-                                    anchors.bottomMargin: -3
-                                    width: 9
-                                    height: 9
-                                    sourceComponent: {
-                                        switch (detRow.gitStatusIcon) {
-                                            case "git-modified":   return gitModifiedIcon
-                                            case "git-staged":     return gitStagedIcon
-                                            case "git-untracked":  return gitUntrackedIcon
-                                            case "git-deleted":    return gitDeletedIcon
-                                            case "git-renamed":    return gitRenamedIcon
-                                            case "git-conflicted": return gitConflictedIcon
-                                            case "git-ignored":    return gitIgnoredIcon
-                                            case "git-dirty":      return gitDirtyIcon
-                                            default: return null
-                                        }
-                                    }
-                                }
-                            }
-
-                            Text {
-                                width: root.colName - 20
-                                anchors.verticalCenter: parent.verticalCenter
-                                textFormat: Text.PlainText
-                                text: detRow.fileName
-                                color: Theme.text
-                                font.pointSize: Theme.fontSmall
-                                elide: Text.ElideRight
-                            }
+                        move: Transition {
+                            enabled: root.animateColumns
+                            NumberAnimation { properties: "x"; duration: Theme.animDuration; easing.type: Theme.animEasingTransition; easing.bezierCurve: Theme.animBezierCurve }
                         }
 
-                        // Size
-                        Text {
-                            width: root.colSize
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: {
-                                if (detRow.isDir) {
-                                    var cnt = root.folderItemCounts[detRow.filePath]
-                                    if (cnt !== undefined)
-                                        return cnt + (cnt === 1 ? " item" : " items")
-                                    return "—"
-                                }
-                                return detRow.fileSizeText
+                        // Every column after Name. Values are read loosely from
+                        // the row's model object because the search results
+                        // model lacks the optional roles.
+                        Repeater {
+                            model: columnModel
+                            delegate: Loader {
+                                required property string key
+                                width: root.columnWidth(key)
+                                height: parent ? parent.height : 0
+                                sourceComponent: key === "name" ? nameCellComponent : textCellComponent
                             }
-                            color: Theme.subtext
-                            font.pointSize: Theme.fontSmall
-                            horizontalAlignment: Text.AlignRight
-                            rightPadding: 8
-                        }
-
-                        // Modified
-                        Text {
-                            width: root.colModified
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: detRow.fileModifiedText
-                            color: Theme.subtext
-                            font.pointSize: Theme.fontSmall
-                            horizontalAlignment: Text.AlignRight
-                            rightPadding: 8
-                        }
-
-                        // Type
-                        Text {
-                            width: root.colType
-                            anchors.verticalCenter: parent.verticalCenter
-                            text: detRow.fileType
-                            color: Theme.subtext
-                            font.pointSize: Theme.fontSmall
-                            elide: Text.ElideRight
-                            rightPadding: 4
                         }
 
                     }
@@ -1053,19 +1422,6 @@ FocusScope {
         }
     }
 
-    KineticWheelScroller {
-        id: wheelScroller
-        anchors.fill: parent
-        z: 12
-        flickable: listView
-        wheelStep: 42
-        mouseWheelMultiplier: 0.75
-        touchpadMultiplier: 1.35
-        minVelocity: 135
-        maxVelocity: 3900
-        kineticGain: 1.01
-        onScrollStarted: root.interactionStarted()
-    }
 
     Connections {
         target: root.viewModel
@@ -1086,6 +1442,7 @@ FocusScope {
             root.reconcileAfterRemove(first, last)
         }
     }
+
 
     Component { id: gitModifiedIcon;   IconGitModified   { size: 9 } }
     Component { id: gitStagedIcon;     IconGitStaged     { size: 9 } }

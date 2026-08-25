@@ -18,6 +18,80 @@ private slots:
 
     // --- Default values ---
 
+    void testListColumnsDefault()
+    {
+        QTemporaryDir dir;
+        ConfigManager mgr(dir.path() + "/config.toml");
+        QCOMPARE(mgr.listColumns(), QStringList({"name", "size", "modified", "type"}));
+        QCOMPARE(mgr.listColumnWidths().value("size").toInt(), 110);
+        QCOMPARE(mgr.listColumnWidths().value("modified").toInt(), 140);
+        QCOMPARE(mgr.listColumnWidths().value("type").toInt(), 80);
+    }
+
+    void testListColumnsRoundTrip()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.path() + "/config.toml";
+        {
+            ConfigManager mgr(path);
+            mgr.saveListColumns({"name", "owner", "size"}, QVariantMap{{"owner", 120}, {"size", 90}});
+            QCOMPARE(mgr.listColumns(), QStringList({"name", "owner", "size"}));
+        }
+        ConfigManager reloaded(path);
+        QCOMPARE(reloaded.listColumns(), QStringList({"name", "owner", "size"}));
+        QCOMPARE(reloaded.listColumnWidths().value("owner").toInt(), 120);
+        QCOMPARE(reloaded.listColumnWidths().value("size").toInt(), 90);
+        // widths for columns that were never saved keep their defaults
+        QCOMPARE(reloaded.listColumnWidths().value("modified").toInt(), 140);
+    }
+
+    void testListColumnsKeepNameAndDropUnknown()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.path() + "/config.toml";
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("[list_view]\ncolumns = [\"size\", \"bogus\", \"name\", \"size\"]\n"
+                "column_widths = { size = 5, bogus = 7 }\n");
+        f.close();
+
+        ConfigManager mgr(path);
+        // order is the user's; duplicates and unknown keys go
+        QCOMPARE(mgr.listColumns(), QStringList({"size", "name"}));
+        QCOMPARE(mgr.listColumnWidths().value("size").toInt(), 40);   // clamped to the minimum
+        QVERIFY(!mgr.listColumnWidths().contains("bogus"));
+
+        ConfigManager noName(path);
+        noName.saveListColumns({"type", "size"}, {});
+        QCOMPARE(noName.listColumns(), QStringList({"name", "type", "size"}));
+    }
+
+    void testMillerFractionsDefault()
+    {
+        QTemporaryDir dir;
+        ConfigManager mgr(dir.path() + "/config.toml");
+        QCOMPARE(mgr.millerFractions().value("parent").toDouble(), 0.2);
+        QCOMPARE(mgr.millerFractions().value("current").toDouble(), 0.5);
+    }
+
+    void testMillerFractionsRoundTripAndClamp()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.path() + "/config.toml";
+        {
+            ConfigManager mgr(path);
+            mgr.saveMillerFractions(0.3, 0.4);
+        }
+        ConfigManager reloaded(path);
+        QCOMPARE(reloaded.millerFractions().value("parent").toDouble(), 0.3);
+        QCOMPARE(reloaded.millerFractions().value("current").toDouble(), 0.4);
+
+        // every column keeps at least 12% of the width
+        reloaded.saveMillerFractions(0.05, 0.9);
+        QCOMPARE(reloaded.millerFractions().value("parent").toDouble(), 0.12);
+        QCOMPARE(reloaded.millerFractions().value("current").toDouble(), 0.76);
+    }
+
     void testDefaultValues()
     {
         QTemporaryDir dir;

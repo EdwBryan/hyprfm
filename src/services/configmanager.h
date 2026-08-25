@@ -30,6 +30,9 @@ class ConfigManager : public QObject
     Q_PROPERTY(bool sidebarVisible READ sidebarVisible NOTIFY configChanged)
     Q_PROPERTY(QStringList hiddenQuickAccess READ hiddenQuickAccess NOTIFY configChanged)
     Q_PROPERTY(QStringList bookmarks READ bookmarks NOTIFY configChanged)
+    Q_PROPERTY(QStringList listColumns READ listColumns NOTIFY listColumnsChanged)
+    Q_PROPERTY(QVariantMap listColumnWidths READ listColumnWidths NOTIFY listColumnsChanged)
+    Q_PROPERTY(QVariantMap millerFractions READ millerFractions NOTIFY millerFractionsChanged)
     Q_PROPERTY(int radiusSmall READ radiusSmall NOTIFY configChanged)
     Q_PROPERTY(int radiusMedium READ radiusMedium NOTIFY configChanged)
     Q_PROPERTY(int radiusLarge READ radiusLarge NOTIFY configChanged)
@@ -71,6 +74,14 @@ public:
     int sidebarWidth() const;
     bool sidebarVisible() const;
     QStringList hiddenQuickAccess() const;
+    // Detailed (list) view columns, in display order. "name" is always present.
+    QStringList listColumns() const;
+    QVariantMap listColumnWidths() const;
+    static QStringList knownListColumns();
+    // Miller view column widths as fractions of the view: {parent, current};
+    // preview takes the rest. Each column keeps at least kMillerMinFraction.
+    QVariantMap millerFractions() const;
+    static constexpr double kMillerMinFraction = 0.12;
     QStringList bookmarks() const;
     int radiusSmall() const;
     int radiusMedium() const;
@@ -101,10 +112,14 @@ public:
                                    bool ascending);
     Q_INVOKABLE void saveShortcuts(const QVariantMap &shortcuts);
     Q_INVOKABLE void saveBookmarks(const QStringList &paths);
+    Q_INVOKABLE void saveListColumns(const QStringList &columns, const QVariantMap &widths);
+    Q_INVOKABLE void saveMillerFractions(double parent, double current);
     Q_INVOKABLE void saveSidebarWidth(int width);
 
 signals:
     void configChanged();
+    void listColumnsChanged();
+    void millerFractionsChanged();
 
 private:
     void loadConfig();
@@ -136,6 +151,12 @@ private:
     int m_sidebarWidth;
     bool m_sidebarVisible;
     QStringList m_hiddenQuickAccess;
+    QStringList m_listColumns;
+    QVariantMap m_listColumnWidths;
+    void setListColumnsNormalized(const QStringList &columns, const QVariantMap &widths);
+    double m_millerParent = 0.2;
+    double m_millerCurrent = 0.5;
+    void setMillerFractionsClamped(double parent, double current);
     QStringList m_bookmarks;
     int m_radiusSmall;
     int m_radiusMedium;

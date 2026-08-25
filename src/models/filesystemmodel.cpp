@@ -733,6 +733,26 @@ QVariant FileSystemModel::data(const QModelIndex &index, int role) const
     case FilePermissionsRole:
         ensurePopulated(entry);
         return entry.permissionsText;
+    case FileOwnerRole:
+        ensurePopulated(entry);
+        return entry.owner;
+    case FileGroupRole:
+        ensurePopulated(entry);
+        return entry.group;
+    case FileCreatedTextRole:
+        ensurePopulated(entry);
+        return entry.createdText;
+    case FileAccessedTextRole:
+        ensurePopulated(entry);
+        return entry.accessedText;
+    case FileExtensionRole:
+        return info.isDir() ? QString() : info.suffix();
+    case MimeTypeRole:
+        if (entry.mimeType.isEmpty())
+            entry.mimeType = mimeDb().mimeTypeForFile(info).name();
+        return entry.mimeType;
+    case SymlinkTargetRole:
+        return info.isSymLink() ? info.symLinkTarget() : QString();
     case FileIconNameRole:
         ensurePopulated(entry);
         return entry.iconName;
@@ -781,6 +801,13 @@ QHash<int, QByteArray> FileSystemModel::roleNames() const
         {GitStatusIconRole,    "gitStatusIcon"},
         {HasImagePreviewRole,  "hasImagePreview"},
         {HasVideoPreviewRole,  "hasVideoPreview"},
+        {FileOwnerRole,        "fileOwner"},
+        {FileGroupRole,        "fileGroup"},
+        {FileCreatedTextRole,  "fileCreatedText"},
+        {FileAccessedTextRole, "fileAccessedText"},
+        {FileExtensionRole,    "fileExtension"},
+        {MimeTypeRole,         "mimeType"},
+        {SymlinkTargetRole,    "symlinkTarget"},
     };
 }
 
@@ -1264,6 +1291,10 @@ void FileSystemModel::ensurePopulated(const Entry &entry) const
     entry.sizeText = isDir ? QString() : formattedSize(entry.info.size());
     entry.modifiedText = QLocale().toString(entry.info.lastModified(), QLocale::ShortFormat);
     entry.permissionsText = permissionsString(entry.info);
+    entry.owner = entry.info.owner();
+    entry.group = entry.info.group();
+    entry.createdText = QLocale().toString(entry.info.birthTime(), QLocale::ShortFormat);
+    entry.accessedText = QLocale().toString(entry.info.lastRead(), QLocale::ShortFormat);
     const PreviewKind kind = previewKindForEntry(absPath, isDir);
     entry.hasImagePreview = kind == PreviewKind::Image;
     entry.hasVideoPreview = kind == PreviewKind::Video;

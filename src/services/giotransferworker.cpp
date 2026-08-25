@@ -370,9 +370,10 @@ void GioTransferWorker::execute(const QList<TransferItem> &items, bool moveOpera
 
 void GioTransferWorker::cancel()
 {
-    m_cancelled.store(true);
     if (m_cancellable)
         g_cancellable_cancel(m_cancellable);
+    QMutexLocker lock(&m_mutex);   // same lost-wake-up guard as resume()
+    m_cancelled.store(true);
     m_pauseCondition.wakeAll();
 }
 
@@ -383,8 +384,14 @@ void GioTransferWorker::pause()
 
 void GioTransferWorker::resume()
 {
-    m_paused.store(false);
-    m_pauseCondition.wakeAll();
+    {
+        // Flip and wake under the mutex, otherwise the worker can test
+        // m_paused, lose the CPU, and then wait() after the wake already
+        // happened — a transfer stuck in "paused" forever.
+        QMutexLocker lock(&m_mutex);
+        m_paused.store(false);
+        m_pauseCondition.wakeAll();
+    }
 }
 
 qint64 GioTransferWorker::scanTotalBytes(const QList<TransferItem> &items)

@@ -42,6 +42,14 @@ public:
         // ambiguous extensions like .ts (TypeScript vs MPEG-TS).
         HasImagePreviewRole,
         HasVideoPreviewRole,
+        // Optional detailed-view columns.
+        FileOwnerRole,
+        FileGroupRole,
+        FileCreatedTextRole,
+        FileAccessedTextRole,
+        FileExtensionRole,
+        MimeTypeRole,
+        SymlinkTargetRole,
     };
     Q_ENUM(Roles)
 
@@ -101,6 +109,11 @@ private:
         mutable QString sizeText;
         mutable QString modifiedText;
         mutable QString permissionsText;
+        mutable QString owner;
+        mutable QString group;
+        mutable QString createdText;
+        mutable QString accessedText;
+        mutable QString mimeType;   // filled on first MimeTypeRole read only
         mutable bool hasImagePreview = false;
         mutable bool hasVideoPreview = false;
         mutable bool populated = false;
