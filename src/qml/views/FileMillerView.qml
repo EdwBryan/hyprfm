@@ -1135,6 +1135,12 @@ FocusScope {
                     }
                 }
 
+                // Double-click on empty space goes up a directory (issue #14).
+                onDoubleClicked: (mouse) => {
+                    if (mouse.button === Qt.LeftButton)
+                        root.goUp()
+                }
+
                 onClicked: (mouse) => {
                     if (mouse.button === Qt.RightButton) {
                         var mp = currentBgMa.mapToItem(null, mouse.x, mouse.y)

@@ -909,6 +909,14 @@ GridView {
             }
         }
 
+        // Double-click on empty space goes up a directory (issue #14).
+        onDoubleClicked: (mouse) => {
+            if (mouse.button !== Qt.LeftButton) return
+            var parent = root.currentPath ? fileOps.parentPath(root.currentPath) : ""
+            if (parent && parent !== root.currentPath)
+                root.fileActivated(parent, true)
+        }
+
         onClicked: (mouse) => {
             if (mouse.button === Qt.RightButton) {
                 var mp = bgMa.mapToItem(null, mouse.x, mouse.y)
