@@ -242,6 +242,25 @@ private slots:
         QCOMPARE(model.activeTab()->currentPath(), QString("/tmp"));
     }
 
+    void testMoveTabReordersAndKeepsActive()
+    {
+        TabListModel model;
+        model.activeTab()->navigateTo("/a");
+        model.addTab(); model.activeTab()->navigateTo("/b");
+        model.addTab(); model.activeTab()->navigateTo("/c");
+        model.setActiveIndex(0);
+
+        model.moveTab(0, 2);
+        QCOMPARE(model.tabAt(0)->currentPath(), QString("/b"));
+        QCOMPARE(model.tabAt(1)->currentPath(), QString("/c"));
+        QCOMPARE(model.tabAt(2)->currentPath(), QString("/a"));
+        QCOMPARE(model.activeIndex(), 2);   // the moved tab stays active
+
+        model.moveTab(2, 0);
+        QCOMPARE(model.tabAt(0)->currentPath(), QString("/a"));
+        QCOMPARE(model.activeIndex(), 0);
+    }
+
     void testTabListModelConsistency()
     {
         TabListModel model;

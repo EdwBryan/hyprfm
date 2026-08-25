@@ -141,6 +141,28 @@ void TabListModel::openPath(const QString &path)
         tab->navigateTo(wanted);
 }
 
+void TabListModel::moveTab(int from, int to)
+{
+    if (from == to || from < 0 || to < 0 || from >= m_tabs.size() || to >= m_tabs.size())
+        return;
+    // beginMoveRows wants the destination as "before this row" in the
+    // pre-move numbering; moving down means one past the target.
+    const int destinationRow = to > from ? to + 1 : to;
+    if (!beginMoveRows(QModelIndex(), from, from, QModelIndex(), destinationRow))
+        return;
+    m_tabs.move(from, to);
+    endMoveRows();
+
+    if (m_activeIndex == from)
+        m_activeIndex = to;
+    else if (from < m_activeIndex && to >= m_activeIndex)
+        --m_activeIndex;
+    else if (from > m_activeIndex && to <= m_activeIndex)
+        ++m_activeIndex;
+    emit activeIndexChanged();
+    emit sessionChanged();
+}
+
 void TabListModel::addTab()
 {
     beginInsertRows(QModelIndex(), m_tabs.size(), m_tabs.size());

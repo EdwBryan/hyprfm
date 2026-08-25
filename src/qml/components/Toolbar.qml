@@ -423,207 +423,317 @@ Rectangle {
                     color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.06)
                 }
 
-                RowLayout {
-                    id: tabRow
+                Flickable {
+                    id: tabStrip
+                    objectName: "tabStrip"
                     anchors.fill: parent
-                    spacing: 0
+                    contentWidth: tabRow.width
+                    contentHeight: height
+                    flickableDirection: Flickable.HorizontalFlick
+                    boundsBehavior: Flickable.StopAtBounds
+                    interactive: false   // tabs handle presses; wheel and auto-scroll move the strip
+                    clip: true
 
-                    // Track how many tabs are closing so others can grow immediately
-                    property int closingCount: 0
-                    property int effectiveCount: Math.max(tabModel.count - closingCount, 1)
-                    property int hoveredIndex: -1
+                    function ensureTabVisible(index) {
+                        if (index < 0 || tabModel.count === 0) return
+                        var w = tabRow.width / Math.max(tabModel.count, 1)
+                        var left = index * w, right = left + w
+                        if (left < contentX) contentX = left
+                        else if (right > contentX + width) contentX = right - width
+                    }
+                    Connections {
+                        target: tabModel
+                        function onActiveIndexChanged() { tabStrip.ensureTabVisible(tabModel.activeIndex) }
+                        function onCountChanged() { Qt.callLater(function() { tabStrip.ensureTabVisible(tabModel.activeIndex) }) }
+                    }
+                    onWidthChanged: ensureTabVisible(tabModel.activeIndex)
+                    Behavior on contentX { NumberAnimation { duration: Theme.animDurationFast; easing.type: Theme.animEasingTransition; easing.bezierCurve: Theme.animBezierCurve } }
 
-                    Repeater {
-                        id: tabRepeater
-                        model: tabModel
+                    function scrollByWheel(wheel) {
+                        var step = wheel.pixelDelta.x !== 0 ? -wheel.pixelDelta.x
+                                 : wheel.pixelDelta.y !== 0 ? -wheel.pixelDelta.y
+                                 : -(wheel.angleDelta.y + wheel.angleDelta.x) / 120 * tabRow.minTabWidth
+                        contentX = Math.max(0, Math.min(contentX + step, contentWidth - width))
+                    }
+                    // A WheelHandler only takes events on its own axis, so one per
+                    // axis: mouse wheel / vertical swipe, and horizontal swipe.
+                    WheelHandler { orientation: Qt.Vertical;   onWheel: (wheel) => tabStrip.scrollByWheel(wheel) }
+                    WheelHandler { orientation: Qt.Horizontal; onWheel: (wheel) => tabStrip.scrollByWheel(wheel) }
 
-                        delegate: Rectangle {
-                            id: tabDelegate
+                    RowLayout {
+                        id: tabRow
+                        // Tabs never go under minTabWidth: past that the strip
+                        // scrolls instead of squeezing them.
+                        readonly property int minTabWidth: 120
+                        width: Math.max(tabStrip.width, tabModel.count * minTabWidth)
+                        height: tabStrip.height
+                        spacing: 0
 
-                            required property int index
-                            required property var model
+                        // Track how many tabs are closing so others can grow immediately
+                        property int closingCount: 0
+                        property int effectiveCount: Math.max(tabModel.count - closingCount, 1)
+                        property int hoveredIndex: -1
+                        property bool reordering: false   // a tab is being dragged: slide displaced tabs
 
-                            Layout.fillHeight: true
-                            Layout.preferredWidth: closing ? 0 : tabRow.width / tabRow.effectiveCount
-                            property bool closing: false
+                        Repeater {
+                            id: tabRepeater
+                            model: tabModel
 
-                            Behavior on Layout.preferredWidth {
-                                NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasingTransition; easing.bezierCurve: Theme.animBezierCurve }
-                            }
+                            delegate: Rectangle {
+                                id: tabDelegate
 
-                            opacity: 0
-                            scale: 0.94
+                                required property int index
+                                required property var model
+                                objectName: "toolbarTab_" + index
 
-                            property int frozenIndex: -1
+                                Layout.fillHeight: true
+                                Layout.preferredWidth: closing ? 0 : tabRow.width / tabRow.effectiveCount
+                                property bool closing: false
 
-                            function startClose() {
-                                if (closing) return
-                                frozenIndex = tabDelegate.index
-                                closing = true
-                                tabRow.closingCount++
-                                exitAnim.start()
-                            }
+                                Behavior on Layout.preferredWidth {
+                                    NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasingTransition; easing.bezierCurve: Theme.animBezierCurve }
+                                }
 
-                            Component.onCompleted: enterAnim.start()
+                                opacity: 0
+                                scale: 0.94
 
-                            ParallelAnimation {
-                                id: enterAnim
+                                property int frozenIndex: -1
+
+                                // Reorder animation. The RowLayout snaps x to the new slot; we offset
+                                // the tab back to where it was and ease that offset to zero, so it
+                                // visibly slides. The dragged tab itself snaps with the pointer.
+                                property real slideOffset: 0
+                                property real lastX: 0
+                                transform: Translate { x: tabDelegate.slideOffset }
+                                onXChanged: {
+                                    if (tabRow.reordering && !tabMa.dragging) {
+                                        slideOffset += lastX - x
+                                        slideAnim.restart()
+                                    }
+                                    lastX = x
+                                }
                                 NumberAnimation {
-                                    target: tabDelegate; property: "opacity"
-                                    from: 0; to: 1; duration: Theme.animDuration
+                                    id: slideAnim
+                                    target: tabDelegate; property: "slideOffset"; to: 0
+                                    duration: Theme.animDuration
                                     easing.type: Theme.animEasingTransition; easing.bezierCurve: Theme.animBezierCurve
                                 }
-                                NumberAnimation {
-                                    target: tabDelegate; property: "scale"
-                                    from: 0.88; to: 1; duration: Theme.animDurationSlow
-                                    easing.type: Easing.OutBack; easing.overshoot: 0.5
+
+                                function startClose() {
+                                    if (closing) return
+                                    frozenIndex = tabDelegate.index
+                                    closing = true
+                                    tabRow.closingCount++
+                                    exitAnim.start()
                                 }
-                            }
 
-                            color: "transparent"
+                                Component.onCompleted: { lastX = x; enterAnim.start() }
 
-                            // Drop area on tab
-                            DropArea {
-                                id: tabDropArea
-                                anchors.fill: parent
-                                keys: ["text/uri-list"]
-
-                                onDropped: (drop) => {
-                                    var destPath = tabDelegate.model.path
-                                    if (!destPath) return
-                                    var urls = drop.urls
-                                    var paths = []
-                                    for (var i = 0; i < urls.length; i++) {
-                                        var s = urls[i].toString()
-                                        paths.push(s.startsWith("file://") ? decodeURIComponent(s.substring(7)) : s)
-                                    }
-                                    if (paths.length === 0) return
-                                    // Don't move files into the directory they're already in
-                                    var allSameDir = paths.every(function(p) {
-                                        var parentDir = p.substring(0, p.lastIndexOf("/"))
-                                        return parentDir === destPath
-                                    })
-                                    if (allSameDir) return
-                                    root.transferRequested(paths, destPath, drop.proposedAction === Qt.MoveAction)
-                                    drop.acceptProposedAction()
-                                }
-                            }
-
-                            SequentialAnimation {
-                                id: exitAnim
                                 ParallelAnimation {
+                                    id: enterAnim
                                     NumberAnimation {
                                         target: tabDelegate; property: "opacity"
-                                        to: 0; duration: Theme.animDuration; easing.type: Theme.animEasingTransition; easing.bezierCurve: Theme.animBezierCurve
+                                        from: 0; to: 1; duration: Theme.animDuration
+                                        easing.type: Theme.animEasingTransition; easing.bezierCurve: Theme.animBezierCurve
                                     }
                                     NumberAnimation {
                                         target: tabDelegate; property: "scale"
-                                        to: 0.88; duration: Theme.animDuration; easing.type: Theme.animEasingTransition; easing.bezierCurve: Theme.animBezierCurve
+                                        from: 0.88; to: 1; duration: Theme.animDurationSlow
+                                        easing.type: Easing.OutBack; easing.overshoot: 0.5
                                     }
                                 }
-                                ScriptAction {
-                                    script: {
-                                        tabRow.closingCount = Math.max(tabRow.closingCount - 1, 0)
-                                        tabModel.closeTab(tabDelegate.frozenIndex)
-                                    }
-                                }
-                            }
 
-                            // Separator between tabs
-                            Rectangle {
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                width: 1
-                                height: parent.height * 0.5
-                                color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.12)
-                                visible: tabDelegate.index < tabModel.count - 1
-                                opacity: (tabDelegate.index === tabModel.activeIndex
-                                    || tabDelegate.index + 1 === tabModel.activeIndex
-                                    || tabDelegate.index === tabRow.hoveredIndex
-                                    || tabDelegate.index + 1 === tabRow.hoveredIndex) ? 0 : 1
-                                Behavior on opacity { NumberAnimation { duration: Theme.animDuration } }
-                            }
+                                color: "transparent"
 
-                            HoverHandler {
-                                id: tabDelegateHover
-                                onHoveredChanged: {
-                                    if (hovered) tabRow.hoveredIndex = tabDelegate.index
-                                    else if (tabRow.hoveredIndex === tabDelegate.index) tabRow.hoveredIndex = -1
-                                }
-                            }
-
-                            MouseArea {
-                                anchors.fill: parent
-                                acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-                                cursorShape: Qt.PointingHandCursor
-                                onClicked: (mouse) => {
-                                    if (mouse.button === Qt.MiddleButton)
-                                        tabDelegate.startClose()
-                                    else
-                                        tabModel.activeIndex = tabDelegate.index
-                                }
-                            }
-
-                            // Inner highlight
-                            Rectangle {
-                                anchors.fill: parent
-                                anchors.margins: 5
-                                radius: Theme.radiusSmall
-                                color: {
-                                    if (tabDelegate.index === tabModel.activeIndex)
-                                        return Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.1)
-                                    if (tabDelegateHover.hovered)
-                                        return Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.05)
-                                    return "transparent"
-                                }
-                                Behavior on color { ColorAnimation { duration: Theme.animDuration } }
-                                border.width: tabDelegate.index === tabModel.activeIndex ? 1 : 0
-                                border.color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08)
-                            }
-
-                            // Tab label
-                            Text {
-                                anchors.left: parent.left
-                                anchors.right: parent.right
-                                anchors.verticalCenter: parent.verticalCenter
-                                horizontalAlignment: Text.AlignHCenter
-                                text: tabDelegate.model.title || "New Tab"
-                                color: tabDelegate.index === tabModel.activeIndex ? Theme.text : Theme.subtext
-                                font.pointSize: Theme.fontNormal
-                                font.weight: tabDelegate.index === tabModel.activeIndex ? Font.Medium : Font.Normal
-                                elide: Text.ElideRight
-                                verticalAlignment: Text.AlignVCenter
-                            }
-
-                            // Close button — only visible on hover
-                            Rectangle {
-                                id: closeBtn
-                                width: 20; height: 20; radius: 10
-                                anchors.right: parent.right
-                                anchors.rightMargin: 6
-                                anchors.verticalCenter: parent.verticalCenter
-                                visible: tabModel.count > 1 && tabDelegateHover.hovered
-                                color: closeHover.hovered
-                                    ? Qt.rgba(Theme.error.r, Theme.error.g, Theme.error.b, 0.8)
-                                    : "transparent"
-                                Behavior on color { ColorAnimation { duration: Theme.animDuration } }
-
-                                IconX {
-                                    anchors.centerIn: parent; size: 10
-                                    color: closeHover.hovered ? Theme.base : Theme.muted
-                                }
-
-                                MouseArea {
+                                // Drop area on tab
+                                DropArea {
+                                    id: tabDropArea
                                     anchors.fill: parent
-                                    onClicked: tabDelegate.startClose()
+                                    keys: ["text/uri-list"]
+
+                                    onDropped: (drop) => {
+                                        var destPath = tabDelegate.model.path
+                                        if (!destPath) return
+                                        var urls = drop.urls
+                                        var paths = []
+                                        for (var i = 0; i < urls.length; i++) {
+                                            var s = urls[i].toString()
+                                            paths.push(s.startsWith("file://") ? decodeURIComponent(s.substring(7)) : s)
+                                        }
+                                        if (paths.length === 0) return
+                                        // Don't move files into the directory they're already in
+                                        var allSameDir = paths.every(function(p) {
+                                            var parentDir = p.substring(0, p.lastIndexOf("/"))
+                                            return parentDir === destPath
+                                        })
+                                        if (allSameDir) return
+                                        root.transferRequested(paths, destPath, drop.proposedAction === Qt.MoveAction)
+                                        drop.acceptProposedAction()
+                                    }
+                                }
+
+                                SequentialAnimation {
+                                    id: exitAnim
+                                    ParallelAnimation {
+                                        NumberAnimation {
+                                            target: tabDelegate; property: "opacity"
+                                            to: 0; duration: Theme.animDuration; easing.type: Theme.animEasingTransition; easing.bezierCurve: Theme.animBezierCurve
+                                        }
+                                        NumberAnimation {
+                                            target: tabDelegate; property: "scale"
+                                            to: 0.88; duration: Theme.animDuration; easing.type: Theme.animEasingTransition; easing.bezierCurve: Theme.animBezierCurve
+                                        }
+                                    }
+                                    ScriptAction {
+                                        script: {
+                                            tabRow.closingCount = Math.max(tabRow.closingCount - 1, 0)
+                                            tabModel.closeTab(tabDelegate.frozenIndex)
+                                        }
+                                    }
+                                }
+
+                                // Separator between tabs
+                                Rectangle {
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    width: 1
+                                    height: parent.height * 0.5
+                                    color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.12)
+                                    visible: tabDelegate.index < tabModel.count - 1
+                                    opacity: (tabDelegate.index === tabModel.activeIndex
+                                        || tabDelegate.index + 1 === tabModel.activeIndex
+                                        || tabDelegate.index === tabRow.hoveredIndex
+                                        || tabDelegate.index + 1 === tabRow.hoveredIndex) ? 0 : 1
+                                    Behavior on opacity { NumberAnimation { duration: Theme.animDuration } }
                                 }
 
                                 HoverHandler {
-                                    id: closeHover
-                                    cursorShape: Qt.PointingHandCursor
+                                    id: tabDelegateHover
+                                    onHoveredChanged: {
+                                        if (hovered) tabRow.hoveredIndex = tabDelegate.index
+                                        else if (tabRow.hoveredIndex === tabDelegate.index) tabRow.hoveredIndex = -1
+                                    }
+                                }
+
+                                MouseArea {
+                                    id: tabMa
+                                    anchors.fill: parent
+                                    acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                                    cursorShape: dragging ? Qt.ClosedHandCursor : Qt.PointingHandCursor
+                                    preventStealing: true   // keep the window-move DragHandler off a tab drag
+                                    property real pressX: 0
+                                    property bool dragging: false
+                                    onPressed: (mouse) => { pressX = mouse.x; dragging = false }
+                                    // Drag sideways to reorder: the model move keeps this
+                                    // delegate alive, so the drag simply continues.
+                                    onPositionChanged: (mouse) => {
+                                        if (!pressed || mouse.buttons !== Qt.LeftButton) return
+                                        if (!dragging && Math.abs(mouse.x - pressX) < 6) return
+                                        if (!dragging) {
+                                            dragging = true
+                                            tabRow.reordering = true
+                                            tabModel.activeIndex = tabDelegate.index
+                                        }
+                                        var xInRow = mapToItem(tabRow, mouse.x, 0).x
+                                        var slot = tabRow.width / Math.max(tabModel.count, 1)
+                                        var target = Math.max(0, Math.min(tabModel.count - 1, Math.floor(xInRow / slot)))
+                                        if (target !== tabDelegate.index)
+                                            tabModel.moveTab(tabDelegate.index, target)
+                                    }
+                                    onReleased: tabRow.reordering = false
+                                    onClicked: (mouse) => {
+                                        if (dragging) { dragging = false; return }
+                                        if (mouse.button === Qt.MiddleButton)
+                                            tabDelegate.startClose()
+                                        else
+                                            tabModel.activeIndex = tabDelegate.index
+                                    }
+                                    onCanceled: { dragging = false; tabRow.reordering = false }
+                                }
+
+                                // Inner highlight
+                                Rectangle {
+                                    anchors.fill: parent
+                                    anchors.margins: 5
+                                    radius: Theme.radiusSmall
+                                    color: {
+                                        if (tabDelegate.index === tabModel.activeIndex)
+                                            return Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.1)
+                                        if (tabDelegateHover.hovered)
+                                            return Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.05)
+                                        return "transparent"
+                                    }
+                                    Behavior on color { ColorAnimation { duration: Theme.animDuration } }
+                                    border.width: tabDelegate.index === tabModel.activeIndex ? 1 : 0
+                                    border.color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.08)
+                                }
+
+                                // Tab label
+                                Text {
+                                    anchors.left: parent.left
+                                    anchors.right: parent.right
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    horizontalAlignment: Text.AlignHCenter
+                                    text: tabDelegate.model.title || "New Tab"
+                                    color: tabDelegate.index === tabModel.activeIndex ? Theme.text : Theme.subtext
+                                    font.pointSize: Theme.fontNormal
+                                    font.weight: tabDelegate.index === tabModel.activeIndex ? Font.Medium : Font.Normal
+                                    elide: Text.ElideRight
+                                    verticalAlignment: Text.AlignVCenter
+                                }
+
+                                // Close button — only visible on hover
+                                Rectangle {
+                                    id: closeBtn
+                                    width: 20; height: 20; radius: 10
+                                    anchors.right: parent.right
+                                    anchors.rightMargin: 6
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    visible: tabModel.count > 1 && tabDelegateHover.hovered
+                                    color: closeHover.hovered
+                                        ? Qt.rgba(Theme.error.r, Theme.error.g, Theme.error.b, 0.8)
+                                        : "transparent"
+                                    Behavior on color { ColorAnimation { duration: Theme.animDuration } }
+
+                                    IconX {
+                                        anchors.centerIn: parent; size: 10
+                                        color: closeHover.hovered ? Theme.base : Theme.muted
+                                    }
+
+                                    MouseArea {
+                                        anchors.fill: parent
+                                        onClicked: tabDelegate.startClose()
+                                    }
+
+                                    HoverHandler {
+                                        id: closeHover
+                                        cursorShape: Qt.PointingHandCursor
+                                    }
                                 }
                             }
                         }
+                    }
+                }
+
+                // Fades hint that the strip continues beyond either edge
+                Rectangle {
+                    anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
+                    width: 24
+                    visible: tabStrip.contentX > 0.5
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop { position: 0; color: Theme.mantle }
+                        GradientStop { position: 1; color: "transparent" }
+                    }
+                }
+                Rectangle {
+                    anchors.right: parent.right; anchors.top: parent.top; anchors.bottom: parent.bottom
+                    width: 24
+                    visible: tabStrip.contentX + tabStrip.width < tabStrip.contentWidth - 0.5
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop { position: 0; color: "transparent" }
+                        GradientStop { position: 1; color: Theme.mantle }
                     }
                 }
             }

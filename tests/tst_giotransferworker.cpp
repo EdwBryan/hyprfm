@@ -33,7 +33,10 @@ private slots:
         QCOMPARE(finishSpy.constFirst().at(0).toBool(), true);
         QVERIFY(QFile::exists(dst.path() + "/test.bin"));
         QCOMPARE(QFileInfo(dst.path() + "/test.bin").size(), 4096);
-        thread.wait();
+        // finished() and the queued thread.quit() race inside spy.wait(): quit
+        // explicitly or wait() can block on a loop that never got the call.
+        thread.quit();
+        QVERIFY(thread.wait(5000));
     }
 
     void testCopyDirectory()
@@ -63,7 +66,10 @@ private slots:
         QVERIFY(QFile::exists(dst.path() + "/dir/b.txt"));
         QVERIFY(QFile::exists(dst.path() + "/dir/sub/c.txt"));
         QCOMPARE(QFileInfo(dst.path() + "/dir/sub/c.txt").size(), 3000);
-        thread.wait();
+        // finished() and the queued thread.quit() race inside spy.wait(): quit
+        // explicitly or wait() can block on a loop that never got the call.
+        thread.quit();
+        QVERIFY(thread.wait(5000));
     }
 
     void testMoveFile()
@@ -89,7 +95,10 @@ private slots:
         QCOMPARE(finishSpy.constFirst().at(0).toBool(), true);
         QVERIFY(QFile::exists(dst.path() + "/move_me.txt"));
         QVERIFY(!QFile::exists(src.path() + "/move_me.txt"));
-        thread.wait();
+        // finished() and the queued thread.quit() race inside spy.wait(): quit
+        // explicitly or wait() can block on a loop that never got the call.
+        thread.quit();
+        QVERIFY(thread.wait(5000));
     }
 
     void testMoveTreeWithSymlinkKeepsLinkTarget()
@@ -115,7 +124,10 @@ private slots:
         thread.start();
 
         QVERIFY(finishSpy.wait(10000));
-        thread.wait();
+        // finished() and the queued thread.quit() race inside spy.wait(): quit
+        // explicitly or wait() can block on a loop that never got the call.
+        thread.quit();
+        QVERIFY(thread.wait(5000));
         QCOMPARE(finishSpy.constFirst().at(0).toBool(), true);
         QVERIFY(QFile::exists(src.path() + "/outside/keep.txt"));
         QVERIFY(QFileInfo(dst.path() + "/tree/lnk").isSymLink());
@@ -147,7 +159,10 @@ private slots:
         QFileInfo linkInfo(dst.path() + "/link.txt");
         QVERIFY(linkInfo.isSymLink());
         QCOMPARE(linkInfo.symLinkTarget(), src.path() + "/real.txt");
-        thread.wait();
+        // finished() and the queued thread.quit() race inside spy.wait(): quit
+        // explicitly or wait() can block on a loop that never got the call.
+        thread.quit();
+        QVERIFY(thread.wait(5000));
     }
 
     void testCancel()
@@ -176,7 +191,10 @@ private slots:
         thread.start();
         QVERIFY(finishSpy.wait(10000));
         QCOMPARE(finishSpy.constFirst().at(0).toBool(), false);
-        thread.wait();
+        // finished() and the queued thread.quit() race inside spy.wait(): quit
+        // explicitly or wait() can block on a loop that never got the call.
+        thread.quit();
+        QVERIFY(thread.wait(5000));
     }
 
     void testPauseResume()
@@ -216,7 +234,10 @@ private slots:
         QCOMPARE(finishSpy.constFirst().at(0).toBool(), true);
         QVERIFY(QFile::exists(dst.path() + "/pause_test.bin"));
         QCOMPARE(QFileInfo(dst.path() + "/pause_test.bin").size(), 8 * 1024 * 1024);
-        thread.wait();
+        // finished() and the queued thread.quit() race inside spy.wait(): quit
+        // explicitly or wait() can block on a loop that never got the call.
+        thread.quit();
+        QVERIFY(thread.wait(5000));
     }
 };
 
