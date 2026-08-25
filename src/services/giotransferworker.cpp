@@ -605,14 +605,26 @@ bool GioTransferWorker::copyRecursive(GFile *source, GFile *destination, GFileCo
 
 bool GioTransferWorker::deleteRecursive(GFile *file, QString *error)
 {
-    // Try to enumerate children (if not a dir, this fails — do direct delete)
+    // Only descend into real directories. NOFOLLOW_SYMLINKS on the
+    // enumerator applies to the children's attributes, not to opening the
+    // node itself, so a symlink to a directory would otherwise be walked
+    // and its target emptied.
+    GFileInfo *selfInfo = g_file_query_info(file,
+        G_FILE_ATTRIBUTE_STANDARD_TYPE,
+        G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, m_cancellable, nullptr);
+    const bool isRealDirectory = selfInfo
+        && g_file_info_get_file_type(selfInfo) == G_FILE_TYPE_DIRECTORY;
+    if (selfInfo) g_object_unref(selfInfo);
+
     GError *enumErr = nullptr;
-    GFileEnumerator *enumerator = g_file_enumerate_children(file,
-        G_FILE_ATTRIBUTE_STANDARD_NAME,
-        G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, m_cancellable, &enumErr);
+    GFileEnumerator *enumerator = isRealDirectory
+        ? g_file_enumerate_children(file,
+              G_FILE_ATTRIBUTE_STANDARD_NAME,
+              G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, m_cancellable, &enumErr)
+        : nullptr;
 
     if (!enumerator) {
-        // Not a directory, direct delete
+        // Not a directory (or a symlink to one): delete the node itself
         if (enumErr) g_error_free(enumErr);
         GError *delErr = nullptr;
         gboolean ok = g_file_delete(file, m_cancellable, &delErr);

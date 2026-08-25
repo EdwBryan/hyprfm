@@ -24,6 +24,10 @@ public:
     Q_INVOKABLE QVariantMap loadFontPreview(const QString &path);
     Q_INVOKABLE QString localPreviewPath(const QString &path) const;
 
+    // Converts bat's ANSI-coloured output to escaped HTML. Public so it can
+    // be unit-tested against hostile byte sequences.
+    static QString ansiToHtml(const QByteArray &ansiText);
+
 public slots:
     // Re-check availability of external tools (pdftoppm/pdfinfo). Called
     // when the user clicks Re-check in the Missing Dependencies dialog

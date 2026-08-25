@@ -1273,7 +1273,10 @@ void FileOperations::deleteFiles(const QStringList &paths)
                     g_object_unref(file);
                 } else {
                     QFileInfo info(normalized);
-                    if (info.isDir()) {
+                    // A symlink to a directory must be unlinked, never
+                    // descended: isDir() follows the link and
+                    // removeRecursively() would empty the target.
+                    if (info.isDir() && !info.isSymLink()) {
                         if (!QDir(normalized).removeRecursively())
                             lastError = QStringLiteral("Failed to delete one or more items");
                     } else {

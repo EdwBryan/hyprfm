@@ -172,7 +172,9 @@ void applyAnsiCode(AnsiState &state, const QList<int> &codes)
     }
 }
 
-QString ansiToHtml(const QByteArray &ansiText)
+} // namespace
+
+QString PreviewService::ansiToHtml(const QByteArray &ansiText)
 {
     QString html = QStringLiteral("<pre style=\"margin:0;font-family:monospace;white-space:pre;\">");
     AnsiState state;
@@ -218,6 +220,12 @@ QString ansiToHtml(const QByteArray &ansiText)
         int nextEscape = ansiText.indexOf('\x1b', index);
         if (nextEscape < 0)
             nextEscape = ansiText.size();
+        if (nextEscape == index) {
+            // ESC that is not a CSI colour sequence (e.g. ESC ( B): drop
+            // the byte and keep going, otherwise the loop never advances.
+            ++index;
+            continue;
+        }
         QString chunk = QString::fromUtf8(ansiText.mid(index, nextEscape - index));
         chunk.replace(QStringLiteral("\t"), QStringLiteral("    "));
         html += chunk.toHtmlEscaped();
@@ -229,6 +237,8 @@ QString ansiToHtml(const QByteArray &ansiText)
     html += QStringLiteral("</pre>");
     return html;
 }
+
+namespace {
 
 QByteArray batPreview(const QString &path, int maxLines, QString *error)
 {

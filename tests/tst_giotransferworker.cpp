@@ -92,6 +92,36 @@ private slots:
         thread.wait();
     }
 
+    void testMoveTreeWithSymlinkKeepsLinkTarget()
+    {
+        TestDir src, dst;
+        src.createDir("outside");
+        src.createFile("outside/keep.txt", "keep");
+        src.createDir("tree");
+        src.createSymlink(src.path() + "/outside", "tree/lnk");
+
+        GioTransferWorker worker;
+        QList<GioTransferWorker::TransferItem> items;
+        items.append({src.path() + "/tree", dst.path() + "/tree", {}, false});
+
+        QSignalSpy finishSpy(&worker, &GioTransferWorker::finished);
+
+        QThread thread;
+        worker.moveToThread(&thread);
+        connect(&thread, &QThread::started, &worker, [&]() {
+            worker.execute(items, true);
+        });
+        connect(&worker, &GioTransferWorker::finished, &thread, &QThread::quit);
+        thread.start();
+
+        QVERIFY(finishSpy.wait(10000));
+        thread.wait();
+        QCOMPARE(finishSpy.constFirst().at(0).toBool(), true);
+        QVERIFY(QFile::exists(src.path() + "/outside/keep.txt"));
+        QVERIFY(QFileInfo(dst.path() + "/tree/lnk").isSymLink());
+        QVERIFY(!QFile::exists(src.path() + "/tree"));
+    }
+
     void testCopySymlink()
     {
         TestDir src, dst;

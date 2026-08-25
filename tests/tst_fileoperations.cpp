@@ -479,6 +479,25 @@ private slots:
         QVERIFY(!dir.exists("doomed_dir"));
     }
 
+    void testDeleteSymlinkToDirectoryKeepsTarget()
+    {
+        TestDir dir;
+        dir.createDir("real");
+        dir.createFile("real/a.txt", "keep");
+        dir.createSymlink(dir.path() + "/real", "link");
+        QVERIFY(QFileInfo(dir.path() + "/link").isSymLink());
+
+        FileOperations ops;
+        QSignalSpy spy(&ops, &FileOperations::operationFinished);
+
+        ops.deleteFiles({dir.path() + "/link"});
+
+        QVERIFY(spy.wait(5000));
+        QVERIFY(dir.exists("real/a.txt"));
+        QVERIFY(!QFileInfo(dir.path() + "/link").isSymLink());
+        QCOMPARE(spy.at(0).at(0).toBool(), true);
+    }
+
     void testDeleteDirectoryViaFileUri()
     {
         TestDir dir;

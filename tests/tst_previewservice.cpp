@@ -1,4 +1,5 @@
 #include <QTest>
+#include <QThread>
 #include <QDir>
 #include <QFile>
 #include <QPainter>
@@ -66,6 +67,23 @@ private slots:
             QCOMPARE(preview.value("usesBat").toBool(), true);
             QVERIFY(preview.value("html").toString().contains("alpha"));
         }
+    }
+
+    void testAnsiToHtmlSurvivesBareEscape()
+    {
+        // bat passes non-CSI escapes (e.g. ESC ( B) through verbatim; the
+        // converter must consume them instead of spinning forever.
+        QString html;
+        QThread *thread = QThread::create([&html]() {
+            html = PreviewService::ansiToHtml(QByteArray("hi \x1b(B there\n"));
+        });
+        thread->start();
+        const bool finished = thread->wait(3000);
+        if (finished)
+            delete thread;   // a stuck thread is leaked on purpose; deleting it would qFatal
+        QVERIFY2(finished, "ansiToHtml did not return on a bare ESC byte");
+        QVERIFY(html.contains("hi"));
+        QVERIFY(html.contains("there"));
     }
 
     void testBinaryPreviewDetection()
