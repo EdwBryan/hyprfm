@@ -386,6 +386,13 @@ jobs:
             git push origin main
           fi
 
+      # The annotated tag's message is the release notes (scripts/release.sh
+      # writes it from a notes file), so the body is reviewed before the push
+      # instead of auto-generated from commit titles.
+      - name: Release notes from the tag message
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: git tag -l --format='%(contents)' "${GITHUB_REF_NAME}" > release-notes.md
+
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
@@ -393,7 +400,7 @@ jobs:
           files: |
             HyprFM-${{ github.ref_name }}-x86_64.AppImage
             HyprFM-${{ github.ref_name }}-x86_64.flatpak
-          generate_release_notes: true
+          body_path: release-notes.md
 
       - name: Trigger website rebuild
         if: startsWith(github.ref, 'refs/tags/v')

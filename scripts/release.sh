@@ -2,7 +2,10 @@
 # scripts/release.sh — cut a new hyprfm release in one step.
 #
 # Usage:
-#   scripts/release.sh 0.4.22 ["One-line release note for metainfo.xml"]
+#   scripts/release.sh 0.4.22 ["One-line release note for metainfo.xml"] [notes.md]
+#
+# notes.md (Markdown) becomes the annotated tag message, which CI publishes
+# as the GitHub release body. Without it the tag just says "Release X.Y.Z".
 #
 # What it does, in order:
 #   1. Bumps every in-tree version reference:
@@ -25,6 +28,7 @@ fi
 
 VERSION="$1"
 NOTE="${2:-}"
+NOTES_FILE="${3:-}"
 
 if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
     echo "release.sh: version must be X.Y.Z (got '$VERSION')" >&2
@@ -47,6 +51,11 @@ done
 if [ -n "$(git status --porcelain --untracked-files=no --ignore-submodules=all)" ]; then
     echo "release.sh: working tree has uncommitted tracked changes. Commit or stash first." >&2
     git status --short --ignore-submodules=all
+    exit 1
+fi
+
+if [ -n "$NOTES_FILE" ] && [ ! -s "$NOTES_FILE" ]; then
+    echo "release.sh: notes file '$NOTES_FILE' is missing or empty" >&2
     exit 1
 fi
 
@@ -135,7 +144,11 @@ fi
 # 5. Commit + tag ----------------------------------------------------------
 git add "$CMAKE_FILE" "$FLATPAK_FILE" "$META_FILE"
 git commit -m "chore: release $TAG"
-git tag -a "$TAG" -m "Release $VERSION"
+if [ -n "$NOTES_FILE" ]; then
+    git tag -a "$TAG" -F "$NOTES_FILE"
+else
+    git tag -a "$TAG" -m "Release $VERSION"
+fi
 
 echo
 echo "==> Release $TAG prepared on $(git rev-parse --abbrev-ref HEAD) as $(git rev-parse --short HEAD)"
