@@ -4,6 +4,7 @@
 #include "third_party/toml.hpp"
 
 #include <QFile>
+#include <QKeySequence>
 #include <QSaveFile>
 #include <QDir>
 #include <QDebug>
@@ -846,6 +847,18 @@ QVariantList ConfigManager::customContextActions() const { return m_customContex
 QString ConfigManager::shortcut(const QString &action) const
 {
     return m_shortcuts.value(action, s_defaultShortcuts.value(action));
+}
+
+// Lets QML key handlers honour a remapped [shortcuts] entry: true when the
+// pressed key + modifiers equal the sequence bound to `action`. Keypad Enter
+// counts as Return so the default "Return" works from both keys.
+bool ConfigManager::keyEventMatches(const QString &action, int key, int modifiers) const
+{
+    if (key == Qt::Key_Enter)
+        key = Qt::Key_Return;
+    const auto mods = Qt::KeyboardModifiers(modifiers) & ~(Qt::KeypadModifier | Qt::GroupSwitchModifier);
+    const QKeySequence want(shortcut(action));
+    return !want.isEmpty() && want == QKeySequence(QKeyCombination(mods, Qt::Key(key)));
 }
 
 void ConfigManager::saveSettings(const QVariantMap &settings)

@@ -3225,7 +3225,7 @@ ApplicationWindow {
 
             if (fileOps.isTrashPath(item.path))
                 return [
-                    { text: "Open", shortcut: "Return", action: "open" },
+                    { text: "Open", shortcut: config.shortcutMap["open"] || "Return", action: "open" },
                     { text: "Open in New Tab", shortcut: "", action: "opennewtab" },
                     { text: "Open in Split View", shortcut: "", action: "split_open", icon: "SquareSplitHorizontal" },
                     { separator: true },
@@ -3235,7 +3235,7 @@ ApplicationWindow {
                 ]
 
             return [
-                { text: "Open", shortcut: "Return", action: "open" },
+                { text: "Open", shortcut: config.shortcutMap["open"] || "Return", action: "open" },
                 { text: "Open in New Tab", shortcut: "", action: "opennewtab" },
                 { text: "Open in Split View", shortcut: "", action: "split_open", icon: "SquareSplitHorizontal" },
                 { separator: true },
@@ -3248,7 +3248,7 @@ ApplicationWindow {
 
         if (item.kind === "bookmark") {
             return [
-                { text: "Open", shortcut: "Return", action: "open" },
+                { text: "Open", shortcut: config.shortcutMap["open"] || "Return", action: "open" },
                 { text: "Open in New Tab", shortcut: "", action: "opennewtab" },
                 { text: "Open in Split View", shortcut: "", action: "split_open", icon: "SquareSplitHorizontal" },
                 { separator: true },
@@ -3267,7 +3267,7 @@ ApplicationWindow {
                 ]
 
             return [
-                { text: "Open", shortcut: "Return", action: "open" },
+                { text: "Open", shortcut: config.shortcutMap["open"] || "Return", action: "open" },
                 { text: "Open in New Tab", shortcut: "", action: "opennewtab" },
                 { text: "Open in Split View", shortcut: "", action: "split_open", icon: "SquareSplitHorizontal" },
                 { separator: true },

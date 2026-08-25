@@ -18,6 +18,25 @@ private slots:
 
     // --- Default values ---
 
+    void testOpenShortcutIsRemappable()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.path() + "/config.toml";
+        {
+            ConfigManager mgr(path);   // defaults
+            QVERIFY(mgr.keyEventMatches("open", Qt::Key_Return, 0));
+            QVERIFY(mgr.keyEventMatches("open", Qt::Key_Enter, Qt::KeypadModifier));
+            QVERIFY(!mgr.keyEventMatches("open", Qt::Key_Return, Qt::ControlModifier));
+        }
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        f.write("[shortcuts]\nopen = \"Ctrl+O\"\n");
+        f.close();
+        ConfigManager mgr(path);
+        QVERIFY(mgr.keyEventMatches("open", Qt::Key_O, Qt::ControlModifier));
+        QVERIFY(!mgr.keyEventMatches("open", Qt::Key_Return, 0));
+    }
+
     void testListColumnsDefault()
     {
         QTemporaryDir dir;

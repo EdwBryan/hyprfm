@@ -110,6 +110,7 @@ public:
     QVariantList shortcutDefinitions() const;
     QVariantList customContextActions() const;
     Q_INVOKABLE QString shortcut(const QString &action) const;
+    Q_INVOKABLE bool keyEventMatches(const QString &action, int key, int modifiers) const;
     Q_INVOKABLE void saveSettings(const QVariantMap &settings);
     // Per-folder sort memory. The getters resolve to the global default
     // (sortBy/sortAscending) when per-folder memory is off or the folder has

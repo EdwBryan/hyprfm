@@ -628,7 +628,7 @@ Item {
             return customItems
         }
         if (!isEmptySpace && targetPath !== "") {
-            items.push({ text: "Open", shortcut: "Return", action: "open", icon: "ExternalLink" })
+            items.push({ text: "Open", shortcut: config.shortcutMap["open"] || "Return", action: "open", icon: "ExternalLink" })
             if (targetIsDir)
                 items.push({ text: "Open in New Tab", shortcut: "", action: "opennewtab", icon: "Folder" })
             if (!splitViewEnabled && !isTrashView) {

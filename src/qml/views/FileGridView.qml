@@ -176,8 +176,7 @@ GridView {
             event.accepted = true
             return
         }
-        if ((event.key === Qt.Key_Return || event.key === Qt.Key_Enter)
-            && !(event.modifiers & (Qt.ControlModifier | Qt.AltModifier | Qt.MetaModifier))) {
+        if (config.keyEventMatches("open", event.key, event.modifiers)) {
             activateCurrentSelection()
             event.accepted = true
             return
