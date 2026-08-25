@@ -41,7 +41,7 @@ HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
 - **Detailed view** with sortable columns, image/video thumbnails, and folder item counts
 - **Miller columns** (`Ctrl+2`) — parent · current · live preview, the macOS Finder favorite
 - **Image and video thumbnails** in detailed and Miller views
-- **Quick preview** (`Space`) — full-screen overlay for images, video, PDFs, text, with metadata sidebar
+- **Quick preview** (`Space`) — full-screen overlay for images, video (poster frame), PDFs, text, with metadata sidebar
 - **Split pane** (`F3`) — work in two directories side by side
 
 <div align="center">
@@ -62,10 +62,10 @@ HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
 
 ### File operations
 
-- **Async copy / move** via `rsync` and `gio` with live progress, speed, ETA, and pause
+- **Async copy / move** via GIO with live progress, speed, ETA, and pause
 - **Drag & drop** between panes, tabs, and external apps (Wayland-native)
 - **Trash** with restore (XDG-compliant)
-- **Bulk rename** with regex find/replace
+- **Bulk rename** — find/replace (plain or regex), prefix/suffix, numbered sequences
 - **Compress / extract** archives
 - **Open With** dialog populated from `.desktop` entries
 - **Undo/redo** for file operations
@@ -180,8 +180,8 @@ The result lands in the repo root as `HyprFM-<version>-x86_64.AppImage`. The scr
 | | Packages |
 |---|---|
 | **Required (build)** | `cmake`, `ninja`, `qt6-base`, `qt6-declarative`, `qt6-svg` |
-| **Required (runtime)** | `qt6-base`, `qt6-declarative`, `qt6-svg`, `qt6-wayland`, `glib2`, `fd`, `rsync`, `xdg-utils` |
-| **Optional** | `kwindowsystem` / `KF6WindowSystem` (native KDE blur), `wl-clipboard` (clipboard), `bat` (syntax highlighting), `gvfs` (remote filesystems), `gvfs-smb` (SMB), `ffmpeg` (video thumbnails), `udisks2` (device mounting), `poppler-qt6` (PDF previews) |
+| **Required (runtime)** | `qt6-base`, `qt6-declarative`, `qt6-svg`, `qt6-wayland`, `glib2`, `gvfs` (trash view), `xdg-utils` |
+| **Optional** | `kwindowsystem` / `KF6WindowSystem` (native KDE blur), `wl-clipboard` (clipboard), `fd` (fast search), `bat` (syntax highlighting), `gvfs-smb` (SMB), `ffmpeg` (video thumbnails), `udisks2` (device mounting), `poppler` / `poppler-utils` (PDF previews via `pdftoppm`) |
 
 ---
 
@@ -250,7 +250,7 @@ Run `hyprfm --help` for the full list of flags and environment variables.
 | `Ctrl+Shift+N` | New folder |
 | `Ctrl+N` | New file |
 
-All shortcuts can be remapped in `~/.config/hyprfm/config.toml` under the `[shortcuts]` section.
+Shortcuts can be remapped in `~/.config/hyprfm/config.toml` under the `[shortcuts]` section (see the generated `config.toml.sample` for the full key list). Fixed: `Backspace`, `Alt+1`…`Alt+9`, `Ctrl+PgUp`/`Ctrl+PgDown`, `Ctrl+Scroll`, `Escape`, `Menu`.
 
 ---
 
@@ -260,14 +260,16 @@ Config lives at `~/.config/hyprfm/config.toml`. On first run HyprFM writes it fu
 
 ```toml
 [general]
-theme = "catppuccin-mocha"     # filename in themes/ without .toml
+# theme = "catppuccin-mocha"   # filename in themes/ without .toml; unset = follow system light/dark
 icon_theme = "Adwaita"         # system icon theme fallback
 builtin_icons = true           # use bundled SVG icons
+font_family = ""               # UI font; empty = desktop font
 default_view = "grid"          # grid | detailed | miller
 show_hidden = false
 dependency_startup_check = true # warn on startup when a required tool is missing
 sort_by = "name"               # name | size | modified | type
 sort_ascending = true
+remember_sort_per_folder = true
 
 [sidebar]
 position = "left"
@@ -281,6 +283,19 @@ hidden_quick_access = []
 radius_small = 4
 radius_medium = 8
 radius_large = 12
+transparency_enabled = true    # needs compositor blur rules to look good
+transparency_level = 1.0       # 0.0 transparent .. 1.0 opaque
+animations_enabled = true
+anim_duration_fast = 100       # ms
+anim_duration = 200
+anim_duration_slow = 350
+anim_curve_enter = "OutCubic"  # Qt easing name, or "Bezier"
+anim_curve_exit = "InCubic"
+anim_curve_transition = "Bezier"
+
+[window]
+# show_controls = false        # unset = only when the compositor draws no decorations
+button_layout = ":minimize,maximize,close"   # ":" splits left from right side
 
 [list_view]
 # Columns in the detailed view, in display order ("name" is always first).
@@ -297,8 +312,13 @@ parent_fraction = 0.2
 current_fraction = 0.5
 
 [bookmarks]
-paths = ["~/Documents", "~/Downloads", "~/Pictures", "~/Projects"]
+# paths = ["~/Documents", "~/Downloads", "~/Pictures", "~/Projects"]   # unset = XDG user folders
 names = { "~/Projects" = "Work" }   # optional display names (right-click → Rename)
+
+[[context_menu.actions]]          # extra right-click entries; %f = path, runs per item
+name = "Optimize PNG"
+command = "oxipng -o 4 %f"
+types = ["png"]                     # "*", "dir", extension, or MIME ("image/*")
 
 [shortcuts]
 # Override any shortcut. Examples:
@@ -359,7 +379,7 @@ HyprFM is a three-layer Qt6 application:
 
 - **QML frontend** (`src/qml/`) — all rendering. `Main.qml` wires tab state, selection, and shortcuts. Views (`FileGridView`, `FileDetailedView`, `FileMillerView`) are switched by `FileViewContainer`. The [Quill](https://github.com/soyeb-jim285/quill) component library provides themed Buttons, TextFields, Cards, etc.
 - **C++ backend** (`src/models/`, `src/services/`, `src/providers/`) — `QAbstractListModel` subclasses for files, tabs, bookmarks, devices. Async services for clipboard, file operations, search, disk usage, previews. Exposed to QML via `setContextProperty`.
-- **System layer** — `rsync` / `gio` via `QProcess` for transfers, UDisks2 over DBus for devices, `wl-copy` for clipboard.
+- **System layer** — GIO (`GioTransferWorker`) for transfers, UDisks2 over DBus for devices, `wl-copy` for clipboard.
 
 See [`CLAUDE.md`](CLAUDE.md) for the full architecture notes used by AI coding assistants.
 
