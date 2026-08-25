@@ -186,8 +186,7 @@ ConfigManager::ConfigManager(const QString &configPath, QObject *parent, const Q
         if (info.lastModified() == m_configModified)
             return;
         m_configModified = info.lastModified();
-        loadConfig();
-        emit configChanged();
+        reload();
     };
     connect(&m_watcher, &QFileSystemWatcher::fileChanged, this, rearmAndReload);
     connect(&m_watcher, &QFileSystemWatcher::directoryChanged, this, rearmAndReload);
@@ -284,12 +283,21 @@ void ConfigManager::setDefaults()
     m_shortcuts = s_defaultShortcuts;
 }
 
+void ConfigManager::reload()
+{
+    loadConfig();
+    emit configChanged();
+}
+
 void ConfigManager::loadConfig()
 {
     if (!QFile::exists(m_configPath))
         return;
 
     try {
+        // Parse before touching any member: a broken file (a duplicated table,
+        // a typo) must leave the last good configuration in effect.
+        auto config = toml::parse_file(m_configPath.toStdString());
         m_fontFamily.clear();
         m_transparencyEnabled = true;
         m_transparencyLevel = 1.0;
@@ -303,7 +311,6 @@ void ConfigManager::loadConfig()
         m_showWindowControlsExplicit = false;
         m_shortcuts = s_defaultShortcuts;
 
-        auto config = toml::parse_file(m_configPath.toStdString());
 
         if (auto v = config["general"]["theme"].value<std::string>())
             m_theme = QString::fromStdString(*v);
@@ -455,8 +462,20 @@ void ConfigManager::loadConfig()
                 m_shortcuts[QStringLiteral("new_file")] = s_defaultShortcuts.value(QStringLiteral("new_file"));
         }
 
+        if (!m_configError.isEmpty()) {
+            m_configError.clear();
+            emit configErrorChanged();
+        }
     } catch (const toml::parse_error &err) {
         qWarning() << "Config parse error:" << err.what();
+        const auto desc = err.description();
+        const QString message = QStringLiteral("config.toml line %1: %2")
+            .arg(err.source().begin.line)
+            .arg(QString::fromUtf8(desc.data(), int(desc.size())));
+        if (message != m_configError) {
+            m_configError = message;
+            emit configErrorChanged();
+        }
     }
     emit listColumnsChanged();
     emit millerFractionsChanged();
@@ -547,7 +566,7 @@ sort_ascending = true
 # Remember a different sort per folder (stored in folder_sort.json).
 remember_sort_per_folder = true
 
-# Warn at startup when an optional tool (ffmpeg, bat, pdftoppm…) is missing.
+# Warn at startup when a tool HyprFM uses (gvfs, ffmpeg, bat, pdftoppm…) is missing.
 dependency_startup_check = true
 
 [sidebar]

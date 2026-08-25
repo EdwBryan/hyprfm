@@ -49,6 +49,8 @@ class ConfigManager : public QObject
     Q_PROPERTY(bool showWindowControls READ showWindowControls NOTIFY configChanged)
     Q_PROPERTY(QString windowButtonLayout READ windowButtonLayout NOTIFY configChanged)
     Q_PROPERTY(QString configPath READ configPath CONSTANT)
+    // Non-empty when config.toml failed to parse; the last good values stay in effect.
+    Q_PROPERTY(QString configError READ configError NOTIFY configErrorChanged)
     Q_PROPERTY(QVariantMap shortcutMap READ shortcutMap NOTIFY configChanged)
     Q_PROPERTY(QVariantList customContextActions READ customContextActions NOTIFY configChanged)
     Q_PROPERTY(QVariantList shortcutDefinitions READ shortcutDefinitions NOTIFY configChanged)
@@ -109,6 +111,9 @@ public:
     QVariantMap shortcutMap() const;
     QVariantList shortcutDefinitions() const;
     QVariantList customContextActions() const;
+    QString configError() const { return m_configError; }
+    // Re-read config.toml now (the file watcher does this on its own).
+    Q_INVOKABLE void reload();
     Q_INVOKABLE QString shortcut(const QString &action) const;
     Q_INVOKABLE bool keyEventMatches(const QString &action, int key, int modifiers) const;
     Q_INVOKABLE void saveSettings(const QVariantMap &settings);
@@ -127,6 +132,7 @@ public:
 
 signals:
     void configChanged();
+    void configErrorChanged();
     void listColumnsChanged();
     void millerFractionsChanged();
 
@@ -185,6 +191,7 @@ private:
     bool m_showWindowControlsExplicit;  // true when user set it in config
     QString m_windowButtonLayout;
     QVariantList m_customContextActions;
+    QString m_configError;
     QMap<QString, QString> m_shortcuts;
     static QMap<QString, QString> s_defaultShortcuts;
 };

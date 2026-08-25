@@ -18,6 +18,34 @@ private slots:
 
     // --- Default values ---
 
+    void testParseErrorIsReportedAndKeepsLastGoodValues()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.path() + "/config.toml";
+        auto write = [&](const QByteArray &text) {
+            QFile f(path);
+            QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Truncate));
+            f.write(text);
+        };
+        write("[sidebar]\nposition = \"right\"\n");
+        ConfigManager mgr(path);
+        QCOMPARE(mgr.configError(), QString());
+        QCOMPARE(mgr.sidebarPosition(), QString("right"));
+
+        // The same table twice is the classic paste-from-sample mistake.
+        write("[sidebar]\nposition = \"left\"\n\n[general]\n\n[sidebar]\nwidth = 187\n");
+        QSignalSpy errorSpy(&mgr, &ConfigManager::configErrorChanged);
+        mgr.reload();
+        QCOMPARE(errorSpy.count(), 1);
+        QVERIFY2(mgr.configError().startsWith("config.toml line 6:"), qPrintable(mgr.configError()));
+        QCOMPARE(mgr.sidebarPosition(), QString("right"));   // last good value kept
+
+        write("[sidebar]\nposition = \"left\"\n");
+        mgr.reload();
+        QCOMPARE(mgr.configError(), QString());
+        QCOMPARE(mgr.sidebarPosition(), QString("left"));
+    }
+
     void testOpenShortcutIsRemappable()
     {
         QTemporaryDir dir;

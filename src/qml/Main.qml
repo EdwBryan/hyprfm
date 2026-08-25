@@ -118,6 +118,13 @@ ApplicationWindow {
     Connections {
         target: config
 
+        // A config.toml that fails to parse used to be a silent qWarning;
+        // show it, since every key silently keeps its previous value.
+        function onConfigErrorChanged() {
+            if (config.configError)
+                toast.show(config.configError, "error")
+        }
+
         function onConfigChanged() {
             root.sidebarVisible = config.sidebarVisible
             root.sidebarWidth = config.sidebarWidth
@@ -131,6 +138,8 @@ ApplicationWindow {
 
     // Force initial load after QML is fully set up
     Component.onCompleted: {
+        if (config.configError)
+            toast.show(config.configError, "error")
         if (tabModel.activeTab) {
             fsModel.setRootPath(tabModel.activeTab.currentPath)
             if (tabModel.activeTab.splitViewEnabled)
