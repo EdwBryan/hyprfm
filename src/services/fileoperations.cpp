@@ -1718,6 +1718,12 @@ void FileOperations::openFileWith(const QString &path, const QString &desktopFil
     }
 
     auto *proc = new QProcess(this);
+    // The launched app inherits gio's stdout/stderr. With the default piped
+    // channels those pipes close when this QProcess is deleted, and the first
+    // thing the app logs afterwards kills it with SIGPIPE — which is why
+    // chatty apps (Krita, mpv/SVP) "did nothing" while Firefox worked. Let it
+    // inherit our own stdio instead; gio's diagnostics land in our log.
+    proc->setProcessChannelMode(QProcess::ForwardedChannels);
     connect(proc, &QProcess::errorOccurred, proc, [this, proc, program](QProcess::ProcessError e) {
         if (e == QProcess::FailedToStart) {
             emit operationFinished(false,
@@ -1726,14 +1732,12 @@ void FileOperations::openFileWith(const QString &path, const QString &desktopFil
         proc->deleteLater();
     });
     connect(proc, qOverload<int, QProcess::ExitStatus>(&QProcess::finished), proc,
-            [this, proc](int exitCode, QProcess::ExitStatus) {
+            [this, proc, desktopFile](int exitCode, QProcess::ExitStatus) {
         // gio exits as soon as the app is launched, so a non-zero code here is
         // a launch failure worth surfacing rather than the app's own exit.
         if (exitCode != 0) {
-            const QString details = QString::fromUtf8(proc->readAllStandardError()).trimmed();
-            emit operationFinished(false, details.isEmpty()
-                ? QStringLiteral("Failed to open the file with that application")
-                : details);
+            emit operationFinished(false,
+                QStringLiteral("Could not launch '%1' — see the log for details").arg(desktopFile));
         }
         proc->deleteLater();
     });

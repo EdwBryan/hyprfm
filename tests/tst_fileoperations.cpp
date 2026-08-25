@@ -122,6 +122,39 @@ private slots:
                  QStringList({"mpv"}));
     }
 
+    // The launched app inherits gio's stdio. If those are pipes back to us,
+    // closing them once gio exits kills any app that later writes to stderr
+    // (Krita, mpv, ...) with SIGPIPE — the "Open With does nothing" report.
+    void testOpenFileWithSurvivesLauncherExit()
+    {
+        if (QStandardPaths::findExecutable("gio").isEmpty())
+            QSKIP("gio not found in PATH");
+
+        QTemporaryDir dir;
+        const QString marker = dir.filePath("alive");
+        const QString script = dir.filePath("app.sh");
+        {
+            QFile f(script);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("#!/bin/sh\nsleep 0.5\necho still-running >&2\ntouch \"$1\"\n");
+        }
+        QFile::setPermissions(script, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+        const QString entry = dir.filePath("app.desktop");
+        {
+            QFile f(entry);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write(QStringLiteral("[Desktop Entry]\nType=Application\nName=Test\nExec=%1 %f\n")
+                        .arg(script).toUtf8());
+        }
+
+        FileOperations ops;
+        QSignalSpy spy(&ops, &FileOperations::operationFinished);
+        ops.openFileWith(marker, entry);
+
+        QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(marker), 5000);
+        QVERIFY2(spy.isEmpty(), "launch reported a failure");
+    }
+
     // --- Copy ---
 
     void testCopyFile()
