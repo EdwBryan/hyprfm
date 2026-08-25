@@ -77,7 +77,15 @@ Q.Dialog {
         if (modeTabs.currentIndex === 0) {
             if (replaceFindField.text === "")
                 return item.name
-            baseName = baseName.split(replaceFindField.text).join(replaceWithField.text)
+            if (replaceRegexToggle.checked) {
+                try {
+                    baseName = baseName.replace(new RegExp(replaceFindField.text, "g"), replaceWithField.text)
+                } catch (e) {
+                    return item.name   // invalid pattern while typing: leave the name alone
+                }
+            } else {
+                baseName = baseName.split(replaceFindField.text).join(replaceWithField.text)
+            }
         } else if (modeTabs.currentIndex === 1) {
             if (addPrefixField.text === "" && addSuffixField.text === "")
                 return item.name
@@ -390,6 +398,13 @@ Q.Dialog {
                         onTextChanged: root.refreshPreview()
                     }
                 }
+            }
+
+            Q.Toggle {
+                id: replaceRegexToggle
+                label: "Regular expression ($1 for groups)"
+                checked: false
+                onToggled: root.refreshPreview()
             }
         }
 
