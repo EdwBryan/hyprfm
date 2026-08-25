@@ -16,6 +16,8 @@ Rectangle {
     property bool isTrashView: false
     property bool isRemoteView: false
     property bool searchMode: false
+    property bool sidebarVisible: true
+    property bool sidebarOnRight: false
     property bool showWindowControls: false
     property string windowButtonLayout: ":minimize,maximize,close"
     property var window: null
@@ -58,6 +60,7 @@ Rectangle {
     signal searchClosed()
     signal searchEnterPressed()
     signal searchNavigateDown()
+    signal sidebarToggleRequested()
     signal backRequested()
     signal forwardRequested()
     signal upRequested()
@@ -113,11 +116,61 @@ Rectangle {
             Layout.fillWidth: true
             Layout.preferredHeight: Theme.toolbarRowHeight
 
-            RowLayout {
-                anchors.fill: parent
+            // Sidebar reveal: the sidebar's own collapse button goes away with
+            // it, so this is the only pointer route back once it is hidden. It
+            // sits on whichever edge the sidebar occupies and animates in from
+            // off-window; the row below reserves its width so nothing jumps.
+            HoverRect {
+                id: sidebarReveal
+                readonly property bool shown: !root.sidebarVisible
+                readonly property real reservedWidth: shown ? Theme.controlSize + 4 : 0
+
+                width: Theme.controlSize
+                height: Theme.controlSize
+                anchors.verticalCenter: parent.verticalCenter
+                anchors.left: root.sidebarOnRight ? undefined : parent.left
+                anchors.right: root.sidebarOnRight ? parent.right : undefined
                 anchors.leftMargin: Theme.spacing
                 anchors.rightMargin: Theme.spacing
+                opacity: shown ? 1.0 : 0.0
+                visible: opacity > 0.01
+                hoverEnabled: shown
+                Accessible.role: Accessible.Button
+                Accessible.name: "Show sidebar"
+                onClicked: root.sidebarToggleRequested()
+
+                IconPanelLeft {
+                    anchors.centerIn: parent
+                    size: 18
+                    color: sidebarReveal.hovered ? Theme.accent : Theme.text
+                    // Slide out of the window edge, and point at the sidebar.
+                    x: (sidebarReveal.shown ? 0 : (root.sidebarOnRight ? 8 : -8))
+                    transform: Scale {
+                        origin.x: 9
+                        xScale: root.sidebarOnRight ? -1 : 1
+                    }
+                    Behavior on x {
+                        NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasingEnter; easing.bezierCurve: Theme.animBezierCurve }
+                    }
+                }
+
+                Behavior on opacity {
+                    NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasingEnter }
+                }
+            }
+
+            RowLayout {
+                anchors.fill: parent
+                anchors.leftMargin: Theme.spacing + (root.sidebarOnRight ? 0 : sidebarReveal.reservedWidth)
+                anchors.rightMargin: Theme.spacing + (root.sidebarOnRight ? sidebarReveal.reservedWidth : 0)
                 spacing: 4
+
+                Behavior on anchors.leftMargin {
+                    NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasingTransition; easing.bezierCurve: Theme.animBezierCurve }
+                }
+                Behavior on anchors.rightMargin {
+                    NumberAnimation { duration: Theme.animDuration; easing.type: Theme.animEasingTransition; easing.bezierCurve: Theme.animBezierCurve }
+                }
 
                 // Left-side window controls
                 Repeater {

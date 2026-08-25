@@ -3465,6 +3465,8 @@ ApplicationWindow {
                 isTrashView: root.isTrashView
                 isRemoteView: root.isRemoteView
                 searchMode: root.searchMode
+                sidebarVisible: root.sidebarVisible
+                sidebarOnRight: config.sidebarPosition === "right"
                 showWindowControls: root.useIntegratedWindowControls
                 windowButtonLayout: config.windowButtonLayout
                 currentSearchQuery: root.searchProxyForPane(activePane).searchQuery
@@ -3472,6 +3474,7 @@ ApplicationWindow {
                 searchDateFilter: root.searchProxyForPane(activePane).dateFilter
                 searchSizeFilter: root.searchProxyForPane(activePane).sizeFilter
                 filterPanelOpen: root.paneFilterPanelOpen(activePane)
+                onSidebarToggleRequested: root.sidebarVisible = !root.sidebarVisible
                 onBackRequested: root.goActivePaneBack()
                 onForwardRequested: root.goActivePaneForward()
                 onUpRequested: root.goActivePaneUp()
