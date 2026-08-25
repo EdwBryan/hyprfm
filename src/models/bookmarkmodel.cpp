@@ -49,7 +49,7 @@ QVariant BookmarkModel::data(const QModelIndex &index, int role) const
 
     const auto &bm = m_bookmarks.at(index.row());
     switch (role) {
-    case NameRole: return bm.name;
+    case NameRole: return bm.customName.isEmpty() ? bm.name : bm.customName;
     case PathRole: return bm.path;
     case IconRole: return bm.icon;
     }
@@ -65,21 +65,23 @@ QHash<int, QByteArray> BookmarkModel::roleNames() const
     };
 }
 
-void BookmarkModel::setBookmarks(const QStringList &paths)
+void BookmarkModel::setBookmarks(const QStringList &paths, const QVariantMap &names)
 {
     QList<Bookmark> updatedBookmarks;
     updatedBookmarks.reserve(paths.size());
 
     bool unchanged = paths.size() == m_bookmarks.size();
     for (int i = 0; i < paths.size(); ++i) {
-        const Bookmark bookmark = makeBookmark(paths.at(i));
+        Bookmark bookmark = makeBookmark(paths.at(i));
+        bookmark.customName = names.value(portablePath(bookmark.path)).toString().trimmed();
         updatedBookmarks.append(bookmark);
 
         if (unchanged) {
             const Bookmark &current = m_bookmarks.at(i);
             unchanged = current.path == bookmark.path
                         && current.name == bookmark.name
-                        && current.icon == bookmark.icon;
+                        && current.icon == bookmark.icon
+                        && current.customName == bookmark.customName;
         }
     }
 
@@ -95,15 +97,28 @@ void BookmarkModel::setBookmarks(const QStringList &paths)
 QStringList BookmarkModel::paths() const
 {
     QStringList result;
-    const QString home = QDir::homePath();
+    for (const auto &bm : m_bookmarks)
+        result.append(portablePath(bm.path));
+    return result;
+}
+
+QVariantMap BookmarkModel::names() const
+{
+    QVariantMap result;
     for (const auto &bm : m_bookmarks) {
-        // Store as ~/... for portability
-        if (bm.path.startsWith(home))
-            result.append("~" + bm.path.mid(home.length()));
-        else
-            result.append(bm.path);
+        if (!bm.customName.isEmpty())
+            result.insert(portablePath(bm.path), bm.customName);
     }
     return result;
+}
+
+QString BookmarkModel::portablePath(const QString &path)
+{
+    // Store as ~/... for portability
+    const QString home = QDir::homePath();
+    if (path.startsWith(home))
+        return "~" + path.mid(home.length());
+    return path;
 }
 
 void BookmarkModel::addBookmark(const QString &path)
@@ -158,6 +173,21 @@ void BookmarkModel::moveBookmark(int from, int to)
         return;
     m_bookmarks.move(from, to);
     endMoveRows();
+    emit bookmarksChanged();
+}
+
+void BookmarkModel::renameBookmark(int index, const QString &name)
+{
+    if (index < 0 || index >= m_bookmarks.size())
+        return;
+
+    const QString trimmed = name.trimmed();
+    Bookmark &bm = m_bookmarks[index];
+    if (bm.customName == trimmed)
+        return;
+    bm.customName = trimmed;
+    const QModelIndex idx = this->index(index);
+    emit dataChanged(idx, idx, {NameRole});
     emit bookmarksChanged();
 }
 

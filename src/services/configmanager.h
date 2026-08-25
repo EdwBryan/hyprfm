@@ -30,6 +30,7 @@ class ConfigManager : public QObject
     Q_PROPERTY(bool sidebarVisible READ sidebarVisible NOTIFY configChanged)
     Q_PROPERTY(QStringList hiddenQuickAccess READ hiddenQuickAccess NOTIFY configChanged)
     Q_PROPERTY(QStringList bookmarks READ bookmarks NOTIFY configChanged)
+    Q_PROPERTY(QVariantMap bookmarkNames READ bookmarkNames NOTIFY configChanged)
     Q_PROPERTY(QStringList listColumns READ listColumns NOTIFY listColumnsChanged)
     Q_PROPERTY(QVariantMap listColumnWidths READ listColumnWidths NOTIFY listColumnsChanged)
     Q_PROPERTY(QVariantMap millerFractions READ millerFractions NOTIFY millerFractionsChanged)
@@ -87,6 +88,8 @@ public:
     QVariantMap millerFractions() const;
     static constexpr double kMillerMinFraction = 0.12;
     QStringList bookmarks() const;
+    // Custom bookmark display names keyed by the entry in bookmarks().
+    QVariantMap bookmarkNames() const;
     int radiusSmall() const;
     int radiusMedium() const;
     int radiusLarge() const;
@@ -115,7 +118,7 @@ public:
     Q_INVOKABLE void setFolderSort(const QString &path, const QString &sortBy,
                                    bool ascending);
     Q_INVOKABLE void saveShortcuts(const QVariantMap &shortcuts);
-    Q_INVOKABLE void saveBookmarks(const QStringList &paths);
+    Q_INVOKABLE void saveBookmarks(const QStringList &paths, const QVariantMap &names = {});
     Q_INVOKABLE void saveListColumns(const QStringList &columns, const QVariantMap &widths);
     Q_INVOKABLE void saveMillerFractions(double parent, double current);
     Q_INVOKABLE void saveSidebarWidth(int width);
@@ -163,6 +166,7 @@ private:
     double m_millerCurrent = 0.5;
     void setMillerFractionsClamped(double parent, double current);
     QStringList m_bookmarks;
+    QVariantMap m_bookmarkNames;
     int m_radiusSmall;
     int m_radiusMedium;
     int m_radiusLarge;

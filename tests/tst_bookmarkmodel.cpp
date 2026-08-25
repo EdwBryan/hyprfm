@@ -127,6 +127,55 @@ private slots:
         QCOMPARE(model.data(idx, BookmarkModel::NameRole).toString(), QString("jim"));
     }
 
+    void testRenameBookmarkOverridesName()
+    {
+        BookmarkModel model;
+        model.setBookmarks({"~/Documents", "~/Downloads"});
+        QSignalSpy dataSpy(&model, &QAbstractItemModel::dataChanged);
+        QSignalSpy changedSpy(&model, &BookmarkModel::bookmarksChanged);
+
+        model.renameBookmark(1, "  Stuff  ");
+
+        QCOMPARE(model.data(model.index(1), BookmarkModel::NameRole).toString(), QString("Stuff"));
+        QCOMPARE(model.data(model.index(0), BookmarkModel::NameRole).toString(), QString("Documents"));
+        QCOMPARE(dataSpy.count(), 1);
+        QCOMPARE(changedSpy.count(), 1);
+        // Stored names are keyed by the portable path form paths() emits.
+        QCOMPARE(model.names(), QVariantMap({{"~/Downloads", "Stuff"}}));
+    }
+
+    void testRenameBookmarkEmptyRevertsToAutoName()
+    {
+        BookmarkModel model;
+        model.setBookmarks({"~/Downloads"});
+        model.renameBookmark(0, "Stuff");
+        model.renameBookmark(0, "   ");
+        QCOMPARE(model.data(model.index(0), BookmarkModel::NameRole).toString(), QString("Downloads"));
+        QVERIFY(model.names().isEmpty());
+    }
+
+    void testRenameBookmarkInvalidIndexIgnored()
+    {
+        BookmarkModel model;
+        model.setBookmarks({"~/Downloads"});
+        QSignalSpy changedSpy(&model, &BookmarkModel::bookmarksChanged);
+        model.renameBookmark(-1, "x");
+        model.renameBookmark(1, "x");
+        QCOMPARE(changedSpy.count(), 0);
+    }
+
+    void testSetBookmarksAppliesNames()
+    {
+        BookmarkModel model;
+        model.setBookmarks({"~/Documents", "~/Downloads"}, QVariantMap{{"~/Downloads", "Stuff"}});
+        QCOMPARE(model.data(model.index(1), BookmarkModel::NameRole).toString(), QString("Stuff"));
+        QCOMPARE(model.data(model.index(1), BookmarkModel::IconRole).toString(), QString("folder-download"));
+
+        // Same paths, name dropped: must not be treated as "unchanged".
+        model.setBookmarks({"~/Documents", "~/Downloads"});
+        QCOMPARE(model.data(model.index(1), BookmarkModel::NameRole).toString(), QString("Downloads"));
+    }
+
     void testRowsResetSignal()
     {
         BookmarkModel model;

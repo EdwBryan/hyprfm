@@ -56,7 +56,7 @@ HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
 - **Full keyboard navigation** — arrows, vim-friendly shortcuts, type-ahead search
 - **Tabs** with independent history per pane
 - **Path bar** with breadcrumbs and inline editing (`Ctrl+L`)
-- **Bookmarks sidebar** with drag-to-reorder and udisks2 device mounting
+- **Bookmarks sidebar** with drag-to-reorder, inline rename, and udisks2 device mounting
 - **Kinetic wheel scrolling** with momentum and rubber-band overscroll
 - **Rubber-band selection** in all views
 
@@ -298,6 +298,7 @@ current_fraction = 0.5
 
 [bookmarks]
 paths = ["~/Documents", "~/Downloads", "~/Pictures", "~/Projects"]
+names = { "~/Projects" = "Work" }   # optional display names (right-click → Rename)
 
 [shortcuts]
 # Override any shortcut. Examples:
@@ -345,8 +346,8 @@ warning = "#f9e2af"
 error   = "#f38ba8"
 ```
 
-`~/.config/hyprfm/themes/example.toml.sample` is written on first run with the
-same table plus a comment per colour, so the directory documents itself.
+`~/.config/hyprfm/themes/example.toml.sample` is rewritten on every start with
+the same table plus a comment per colour, so the directory documents itself.
 
 Themes reload live on save.
 

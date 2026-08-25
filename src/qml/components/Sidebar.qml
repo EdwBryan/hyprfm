@@ -14,6 +14,13 @@ Rectangle {
     property bool isRecentsView: false
     property Item tooltipLayer: null
     signal bookmarkClicked(string path)
+
+    // Index of the bookmark being renamed inline, -1 when none.
+    property int renamingBookmarkIndex: -1
+    function startBookmarkRename(index) {
+        if (index >= 0 && index < bookmarks.count)
+            renamingBookmarkIndex = index
+    }
     signal sidebarContextMenuRequested(var item, point position)
     signal recentsClicked()
     signal collapseClicked()
@@ -369,6 +376,7 @@ Rectangle {
                             }
 
                             Text {
+                                visible: !bmRenameBox.visible
                                 textFormat: Text.PlainText
                                 text: model.name
                                 color: bmDelegate.isActive ? Theme.accent : Theme.text
@@ -376,6 +384,51 @@ Rectangle {
                                 verticalAlignment: Text.AlignVCenter
                                 elide: Text.ElideRight
                                 width: parent.width - 18 - Theme.spacing
+                            }
+
+                            // Inline rename: Return commits, Escape cancels,
+                            // losing focus commits (same as renaming a file).
+                            Rectangle {
+                                id: bmRenameBox
+                                visible: root.renamingBookmarkIndex === index
+                                width: parent.width - 18 - Theme.spacing
+                                height: bookmarksSection.rowHeight - 6
+                                anchors.verticalCenter: parent.verticalCenter
+                                color: Theme.surface
+                                radius: Theme.radiusSmall
+                                border.color: Theme.accent
+                                border.width: 1
+
+                                onVisibleChanged: {
+                                    if (!visible) return
+                                    bmRenameInput.text = model.name
+                                    bmRenameInput.forceActiveFocus()
+                                    bmRenameInput.selectAll()
+                                }
+
+                                TextInput {
+                                    id: bmRenameInput
+                                    objectName: "bookmarkRenameInput"
+                                    anchors.fill: parent
+                                    anchors.leftMargin: Theme.spacing / 2
+                                    anchors.rightMargin: Theme.spacing / 2
+                                    verticalAlignment: TextInput.AlignVCenter
+                                    color: Theme.text
+                                    font.pointSize: Theme.fontNormal
+                                    selectionColor: Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.4)
+                                    clip: true
+                                    Accessible.role: Accessible.EditableText
+                                    Accessible.name: "Rename bookmark"
+
+                                    function finish(commit) {
+                                        if (root.renamingBookmarkIndex !== index) return
+                                        if (commit) bookmarks.renameBookmark(index, text)
+                                        root.renamingBookmarkIndex = -1
+                                    }
+                                    onAccepted: finish(true)
+                                    Keys.onEscapePressed: finish(false)
+                                    onActiveFocusChanged: if (!activeFocus) finish(true)
+                                }
                             }
                         }
                     }
@@ -429,6 +482,8 @@ Rectangle {
                 id: bmInteraction
                 anchors.fill: bookmarksList
                 z: 100
+                // Let the inline rename field receive the mouse while editing.
+                enabled: root.renamingBookmarkIndex < 0
                 hoverEnabled: true
                 cursorShape: bookmarksSection.dragCurrentIndex >= 0 ? Qt.ClosedHandCursor : Qt.PointingHandCursor
                 acceptedButtons: Qt.LeftButton | Qt.RightButton

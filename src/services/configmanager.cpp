@@ -264,6 +264,7 @@ void ConfigManager::setDefaults()
     setListColumnsNormalized({}, {});
     setMillerFractionsClamped(0.2, 0.5);
     m_bookmarks = defaultBookmarkPaths();
+    m_bookmarkNames.clear();
     m_radiusSmall = 4;
     m_radiusMedium = 8;
     m_radiusLarge = 12;
@@ -407,6 +408,13 @@ void ConfigManager::loadConfig()
             for (const auto &item : *arr) {
                 if (auto v = item.value<std::string>())
                     m_bookmarks.append(QString::fromStdString(*v));
+            }
+        }
+        if (auto names = config["bookmarks"]["names"].as_table()) {
+            for (const auto &[key, val] : *names) {
+                if (auto v = val.value<std::string>())
+                    m_bookmarkNames.insert(QString::fromStdString(std::string(key)),
+                                           QString::fromStdString(*v));
             }
         }
 
@@ -597,6 +605,9 @@ current_fraction = 0.5
 [bookmarks]
 # Sidebar bookmarks. Unset = the XDG user folders that exist on this machine.
 # paths = ["~/Documents", "~/Downloads", "~/Pictures", "~/Projects"]
+# Custom display names, keyed by an entry of paths. Right-click a bookmark
+# and choose "Rename" to set one in-app.
+# names = { "~/Projects" = "Work" }
 
 [shortcuts]
 # Override any shortcut with a Qt key sequence. Defaults:
@@ -762,6 +773,7 @@ int ConfigManager::sidebarWidth() const { return m_sidebarWidth; }
 bool ConfigManager::sidebarVisible() const { return m_sidebarVisible; }
 QStringList ConfigManager::hiddenQuickAccess() const { return m_hiddenQuickAccess; }
 QStringList ConfigManager::bookmarks() const { return m_bookmarks; }
+QVariantMap ConfigManager::bookmarkNames() const { return m_bookmarkNames; }
 int ConfigManager::radiusSmall() const { return m_radiusSmall; }
 int ConfigManager::radiusMedium() const { return m_radiusMedium; }
 int ConfigManager::radiusLarge() const { return m_radiusLarge; }
@@ -1173,9 +1185,10 @@ void ConfigManager::saveShortcuts(const QVariantMap &shortcuts)
     emit configChanged();
 }
 
-void ConfigManager::saveBookmarks(const QStringList &paths)
+void ConfigManager::saveBookmarks(const QStringList &paths, const QVariantMap &names)
 {
     m_bookmarks = paths;
+    m_bookmarkNames = names;
 
     const bool wasWatchingConfig = m_watcher.files().contains(m_configPath);
     if (wasWatchingConfig)
@@ -1193,7 +1206,14 @@ void ConfigManager::saveBookmarks(const QStringList &paths)
     toml::array arr;
     for (const auto &p : paths)
         arr.push_back(p.toStdString());
-    config.insert_or_assign("bookmarks", toml::table{{"paths", std::move(arr)}});
+    toml::table bookmarksTable{{"paths", std::move(arr)}};
+    if (!names.isEmpty()) {
+        toml::table nameTable;
+        for (auto it = names.cbegin(); it != names.cend(); ++it)
+            nameTable.insert_or_assign(it.key().toStdString(), it.value().toString().toStdString());
+        bookmarksTable.insert_or_assign("names", std::move(nameTable));
+    }
+    config.insert_or_assign("bookmarks", std::move(bookmarksTable));
 
     // Write back
     std::ofstream ofs(m_configPath.toStdString());

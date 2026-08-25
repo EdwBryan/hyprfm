@@ -489,6 +489,7 @@ ApplicationWindow {
             && !settingsPanel.visible
             && !shortcutsDialog.visible
             && !renameDialog.visible
+            && sidebarPanel.renamingBookmarkIndex < 0
             && !newFolderDialog.visible
             && !newFileDialog.visible
             && !conflictDialog.visible
@@ -2811,6 +2812,9 @@ ApplicationWindow {
         onCustomActionRequested: (action) => {
             if (action === "emptytrash") {
                 emptyTrashConfirmDialog.open()
+            } else if (action === "renamebookmark") {
+                if (sidebarItem.kind === "bookmark" && sidebarItem.index >= 0)
+                    sidebarPanel.startBookmarkRename(sidebarItem.index)
             } else if (action === "removebookmark") {
                 if (sidebarItem.kind === "bookmark" && sidebarItem.index >= 0)
                     bookmarks.removeBookmark(sidebarItem.index)
@@ -3250,6 +3254,7 @@ ApplicationWindow {
                 { text: "Open in Terminal", shortcut: "", action: "terminal" },
                 { text: "Properties", shortcut: "", action: "properties" },
                 { separator: true },
+                { text: "Rename", shortcut: "", action: "renamebookmark" },
                 { text: "Remove from Bookmarks", shortcut: "", action: "removebookmark", destructive: true }
             ]
         }
@@ -3366,6 +3371,8 @@ ApplicationWindow {
                 }
 
                 Sidebar {
+                    id: sidebarPanel
+                    objectName: "sidebarPanel"
                     width: root.sidebarWidth
                     height: parent.height
                     tooltipLayer: sidebarTooltipLayer
@@ -3374,6 +3381,10 @@ ApplicationWindow {
                     isRecentsView: root.isRecentsView
                     onBookmarkClicked: (path) => {
                         root.navigateActivePaneTo(path)
+                    }
+                    onRenamingBookmarkIndexChanged: {
+                        if (renamingBookmarkIndex < 0)
+                            root.scheduleActivePaneFocus()
                     }
                     onSidebarContextMenuRequested: (item, position) => {
                         sidebarContextMenu.sidebarItem = item

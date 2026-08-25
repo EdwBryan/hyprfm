@@ -343,10 +343,10 @@ int main(int argc, char *argv[])
     // the bundled set.
     QStringList themeDirs;
     const QString userThemesDir = configDir + "/themes";
-    const bool freshThemesDir = !QDir(userThemesDir).exists();
     QDir().mkpath(userThemesDir);
-    if (freshThemesDir) {
-        // Seed the directory with a documented sample so it explains itself.
+    {
+        // Refresh the documented sample on every start, like config.toml.sample,
+        // so it always describes the running version's colour keys.
         // The ".sample" suffix keeps it out of the "*.toml" theme picker.
         QFile sample(userThemesDir + "/example.toml.sample");
         if (sample.open(QIODevice::WriteOnly | QIODevice::Text))
@@ -404,11 +404,11 @@ int main(int argc, char *argv[])
     }
 
     BookmarkModel *bookmarks = new BookmarkModel(&app);
-    bookmarks->setBookmarks(config->bookmarks());
+    bookmarks->setBookmarks(config->bookmarks(), config->bookmarkNames());
 
     // Persist bookmark changes to config
     QObject::connect(bookmarks, &BookmarkModel::bookmarksChanged, [=]() {
-        config->saveBookmarks(bookmarks->paths());
+        config->saveBookmarks(bookmarks->paths(), bookmarks->names());
     });
 
     FileOperations *fileOps = new FileOperations(&app);
@@ -472,7 +472,7 @@ int main(int argc, char *argv[])
     // Keep the live UI in sync with persisted config values.
     QObject::connect(config, &ConfigManager::configChanged, [=, &app, &resolveUiFont]() {
         theme->loadTheme(config->theme(), themeDirs);
-        bookmarks->setBookmarks(config->bookmarks());
+        bookmarks->setBookmarks(config->bookmarks(), config->bookmarkNames());
         fsModel->setShowHidden(config->showHidden());
         splitFsModel->setShowHidden(config->showHidden());
         millerParentModel->setShowHidden(config->showHidden());

@@ -252,6 +252,39 @@ private slots:
         }
     }
 
+    void testBookmarkNamesRoundTrip()
+    {
+        QTemporaryDir dir;
+        QString path = dir.path() + "/config.toml";
+
+        ConfigManager mgr(path);
+        QVERIFY(mgr.bookmarkNames().isEmpty());
+
+        mgr.saveBookmarks({"~/Projects", "~/Downloads"}, QVariantMap{{"~/Projects", "Work"}});
+
+        ConfigManager mgr2(path);
+        QCOMPARE(mgr2.bookmarks(), QStringList({"~/Projects", "~/Downloads"}));
+        QCOMPARE(mgr2.bookmarkNames(), QVariantMap({{"~/Projects", "Work"}}));
+
+        // Reverting to the auto name removes the entry rather than keeping a stale one.
+        mgr2.saveBookmarks({"~/Projects", "~/Downloads"}, QVariantMap());
+        ConfigManager mgr3(path);
+        QVERIFY(mgr3.bookmarkNames().isEmpty());
+    }
+
+    void testBookmarkNamesFromHandEditedConfig()
+    {
+        QTemporaryDir dir;
+        QString path = dir.path() + "/config.toml";
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("[bookmarks]\npaths = [\"~/Projects\"]\nnames = { \"~/Projects\" = \"Work\" }\n");
+        f.close();
+
+        ConfigManager mgr(path);
+        QCOMPARE(mgr.bookmarkNames(), QVariantMap({{"~/Projects", "Work"}}));
+    }
+
     void testDefaultShortcuts()
     {
         QTemporaryDir dir;

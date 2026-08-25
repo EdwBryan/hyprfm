@@ -47,6 +47,7 @@ class TestMainWindow : public QObject
         QQmlApplicationEngine engine;
         QObject owner;   // parents everything so teardown order is sane
         TabListModel *tabModel = nullptr;
+        BookmarkModel *bookmarks = nullptr;
         QQuickWindow *window = nullptr;
 
         bool load()
@@ -71,7 +72,7 @@ class TestMainWindow : public QObject
             auto *theme = new ThemeLoader(&owner);
             theme->loadTheme(config->theme(), themeDirs);
             tabModel = new TabListModel(&owner);
-            auto *bookmarks = new BookmarkModel(&owner);
+            bookmarks = new BookmarkModel(&owner);
             auto *fileOps = new FileOperations(&owner);
             auto *undoManager = new UndoManager(fileOps, &owner);
             auto *clipboard = new ClipboardManager(&owner);
@@ -182,6 +183,35 @@ private slots:
         app.wheel(app.center(strip), QPoint(0, -120));
         QTRY_VERIFY2(strip->property("contentX").toReal() > 0,
                      qPrintable(QStringLiteral("contentX stayed %1").arg(strip->property("contentX").toReal())));
+    }
+
+    void testInlineBookmarkRenameCommitsOnReturnAndCancelsOnEscape()
+    {
+        App app;
+        QVERIFY(app.load());
+        app.bookmarks->setBookmarks({"~/Documents"});
+        QQuickItem *sidebar = app.item("sidebarPanel");
+        QVERIFY(sidebar);
+
+        QVERIFY(QMetaObject::invokeMethod(sidebar, "startBookmarkRename", Q_ARG(QVariant, 0)));
+        QQuickItem *input = app.item("bookmarkRenameInput");
+        QVERIFY(input);
+        QTRY_VERIFY(input->hasActiveFocus());
+        for (QChar c : QStringLiteral("Work"))   // replaces the selected auto name
+            QTest::keyClick(app.window, c.toLatin1());
+        QTest::keyClick(app.window, Qt::Key_Return);
+        QTRY_COMPARE(sidebar->property("renamingBookmarkIndex").toInt(), -1);
+        QCOMPARE(app.bookmarks->data(app.bookmarks->index(0), BookmarkModel::NameRole).toString(),
+                 QString("Work"));
+
+        QVERIFY(QMetaObject::invokeMethod(sidebar, "startBookmarkRename", Q_ARG(QVariant, 0)));
+        QTRY_VERIFY(input->hasActiveFocus());
+        for (QChar c : QStringLiteral("Nope"))
+            QTest::keyClick(app.window, c.toLatin1());
+        QTest::keyClick(app.window, Qt::Key_Escape);
+        QTRY_COMPARE(sidebar->property("renamingBookmarkIndex").toInt(), -1);
+        QCOMPARE(app.bookmarks->data(app.bookmarks->index(0), BookmarkModel::NameRole).toString(),
+                 QString("Work"));
     }
 };
 
