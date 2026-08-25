@@ -157,6 +157,16 @@ class TestMainWindow : public QObject
             return nullptr;
         }
         QQuickItem *item(const QString &name) { return findItem(window->contentItem(), name); }
+        static QQuickItem *findText(QQuickItem *parent, const QString &text)
+        {
+            for (QQuickItem *child : parent->childItems()) {
+                if (child->property("text").toString() == text)
+                    return child;
+                if (QQuickItem *hit = findText(child, text))
+                    return hit;
+            }
+            return nullptr;
+        }
         QPoint center(QQuickItem *it) { return it->mapToScene(QPointF(it->width() / 2, it->height() / 2)).toPoint(); }
         void wheel(const QPoint &pos, const QPoint &angle)
         {
@@ -167,6 +177,31 @@ class TestMainWindow : public QObject
     };
 
 private slots:
+    // Issue #13: menus used a fixed width, so long rows overflowed the popup.
+    void testContextMenuWidensForLongLabels()
+    {
+        App app;
+        QVERIFY(app.load());
+        QQuickItem *menu = app.item("contextMenu");
+        QVERIFY(menu);
+        const int base = menu->property("menuWidth").toInt();
+
+        const QString label = QStringLiteral("Remove this rather long entry from Bookmarks right now");
+        menu->setProperty("customItems", QVariantList{QVariantMap{
+            {"text", label}, {"action", "noop"}, {"shortcut", "Ctrl+Shift+Alt+B"}}});
+        QVERIFY(QMetaObject::invokeMethod(menu, "popup", Q_ARG(QVariant, 20), Q_ARG(QVariant, 20)));
+        QTRY_VERIFY(menu->property("effectiveMenuWidth").toInt() > base);
+        QQuickItem *text = App::findText(menu, label);
+        QVERIFY(text);
+        QTRY_VERIFY2(text->property("contentWidth").toReal() <= text->width() + 0.5,
+                     qPrintable(QStringLiteral("label %1px wide in a %2px slot")
+                                    .arg(text->property("contentWidth").toReal()).arg(text->width())));
+
+        // Short rows keep the compact default width.
+        menu->setProperty("customItems", QVariantList{QVariantMap{{"text", "Open"}, {"action", "noop"}}});
+        QTRY_COMPARE(menu->property("effectiveMenuWidth").toInt(), base);
+    }
+
     void testWheelOverTabStripScrollsTabsInTheFullWindow()
     {
         App app;

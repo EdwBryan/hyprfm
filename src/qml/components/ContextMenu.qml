@@ -48,6 +48,35 @@ Item {
     signal emptyTrashRequested()
     signal customActionRequested(string action)
 
+    // Menus grow to fit their widest row instead of clipping it (issue #13).
+    // The measurements mirror the row layouts below: margins, icon slots,
+    // spacing, text, shortcut, chevron/check.
+    FontMetrics { id: itemFont; font.pointSize: Theme.fontNormal }
+    FontMetrics { id: smallFont; font.pointSize: Theme.fontSmall }
+    FontMetrics { id: subShortcutFont; font.pixelSize: 11 }
+
+    function itemRowWidth(item) {
+        var w = 24 + 16 + 8 + itemFont.advanceWidth(item.text || "")
+        if (item.shortcut) w += 8 + smallFont.advanceWidth(item.shortcut)
+        if (item.isSubmenu) w += 8 + 14
+        return w
+    }
+    function subItemRowWidth(item) {
+        var w = 36 + (item.iconName ? 18 + 8 : 0) + 14 + 8 + smallFont.advanceWidth(item.text || "")
+        if (item.shortcut) w += 8 + subShortcutFont.advanceWidth(item.shortcut)
+        if (item.checked) w += 8 + 14
+        return w
+    }
+    function widestRow(items, measure) {
+        var w = 0
+        for (var i = 0; i < items.length; ++i)
+            if (!items[i].separator) w = Math.max(w, measure(items[i]))
+        return Math.ceil(w) + 4
+    }
+    readonly property var menuModel: root.visible ? buildModel() : []
+    readonly property int effectiveMenuWidth: Math.max(menuWidth, widestRow(menuModel, itemRowWidth))
+    readonly property int effectiveSubmenuWidth: Math.max(menuWidth, widestRow(submenuItems, subItemRowWidth))
+
     property string currentViewMode: "grid"
     property string currentSortBy: "name"
     property bool currentSortAscending: true
@@ -399,11 +428,11 @@ Item {
         Column {
             id: menuColumn
             anchors.centerIn: parent
-            width: root.menuWidth
+            width: root.effectiveMenuWidth
             spacing: 2
 
             Repeater {
-                model: root.visible ? root.buildModel() : []
+                model: root.menuModel
                 delegate: Loader {
                     id: delegateLoader
                     width: menuColumn.width
@@ -543,7 +572,7 @@ Item {
             id: submenuColumn
             x: submenuContainer.bodyX + 6
             y: 6
-            width: root.menuWidth
+            width: root.effectiveSubmenuWidth
             spacing: 2
 
             Repeater {

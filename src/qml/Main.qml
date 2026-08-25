@@ -2676,6 +2676,7 @@ ApplicationWindow {
     // ── Context Menu ────────────────────────────────────────────────────────
     ContextMenu {
         id: contextMenu
+        objectName: "contextMenu"
         blurSource: mainContent
 
         fileModel: root.paneBaseModel(root.activePane)
