@@ -32,6 +32,10 @@ public:
     TabModel *tabAt(int index) const;
 
     Q_INVOKABLE void addTab();
+    // Show `path`: activate the tab that already displays it, else open a
+    // new tab there. Used for launch arguments and single-instance handoffs
+    // so repeated launches don't pile up duplicate tabs.
+    Q_INVOKABLE void openPath(const QString &path);
     Q_INVOKABLE void closeTab(int index);
     Q_INVOKABLE void reopenClosedTab();
 

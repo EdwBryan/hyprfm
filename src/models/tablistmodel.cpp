@@ -127,6 +127,20 @@ void TabListModel::setDefaultViewMode(const QString &mode)
     }
 }
 
+void TabListModel::openPath(const QString &path)
+{
+    const QString wanted = QDir::cleanPath(path);
+    for (int i = 0; i < m_tabs.size(); ++i) {
+        if (QDir::cleanPath(m_tabs.at(i)->currentPath()) == wanted) {
+            setActiveIndex(i);
+            return;
+        }
+    }
+    addTab();
+    if (auto *tab = activeTab())
+        tab->navigateTo(wanted);
+}
+
 void TabListModel::addTab()
 {
     beginInsertRows(QModelIndex(), m_tabs.size(), m_tabs.size());

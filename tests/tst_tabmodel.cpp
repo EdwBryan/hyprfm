@@ -225,6 +225,23 @@ private slots:
         QVERIFY(model.activeTab() != nullptr);
     }
 
+    void testOpenPathReusesTabAlreadyShowingIt()
+    {
+        TabListModel model;
+        const int initial = model.rowCount();
+
+        model.openPath("/tmp");
+        QCOMPARE(model.rowCount(), initial + 1);
+        QCOMPARE(model.activeTab()->currentPath(), QString("/tmp"));
+
+        model.addTab();
+        model.activeTab()->navigateTo("/usr");
+        // Same folder again (even with a trailing slash): switch, don't add.
+        model.openPath("/tmp/");
+        QCOMPARE(model.rowCount(), initial + 2);
+        QCOMPARE(model.activeTab()->currentPath(), QString("/tmp"));
+    }
+
     void testTabListModelConsistency()
     {
         TabListModel model;

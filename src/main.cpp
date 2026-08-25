@@ -697,11 +697,8 @@ int main(int argc, char *argv[])
     // argv path and for paths forwarded by a subsequent invocation over
     // the single-instance socket. Empty path just raises the window.
     auto openPathInNewTab = [&engine, tabModel](const QString &path) {
-        if (!path.isEmpty()) {
-            tabModel->addTab();
-            if (auto *tab = tabModel->activeTab())
-                tab->navigateTo(path);
-        }
+        if (!path.isEmpty())
+            tabModel->openPath(path);   // reuses a tab already showing it
         if (engine.rootObjects().isEmpty())
             return;
         if (auto *win = qobject_cast<QQuickWindow *>(engine.rootObjects().first())) {
