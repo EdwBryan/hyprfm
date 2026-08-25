@@ -177,9 +177,6 @@ private slots:
 
     void testCopyFile()
     {
-        if (QStandardPaths::findExecutable("rsync").isEmpty())
-            QSKIP("rsync not found in PATH");
-
         TestDir src, dst;
         src.createFile("test.txt", "hello");
 
@@ -197,9 +194,6 @@ private slots:
 
     void testCopyMultipleFiles()
     {
-        if (QStandardPaths::findExecutable("rsync").isEmpty())
-            QSKIP("rsync not found in PATH");
-
         TestDir src, dst;
         src.createFile("a.txt", "aaa");
         src.createFile("b.txt", "bbb");
@@ -216,9 +210,6 @@ private slots:
 
     void testCopyDirectory()
     {
-        if (QStandardPaths::findExecutable("rsync").isEmpty())
-            QSKIP("rsync not found in PATH");
-
         TestDir src, dst;
         src.createDir("subdir");
         src.createFile("subdir/inner.txt", "content");
@@ -234,9 +225,6 @@ private slots:
 
     void testCopyEmitsBusyChanged()
     {
-        if (QStandardPaths::findExecutable("rsync").isEmpty())
-            QSKIP("rsync not found in PATH");
-
         TestDir src, dst;
         src.createFile("test.txt", "data");
 
@@ -254,9 +242,6 @@ private slots:
 
     void testCopyEmitsStatusText()
     {
-        if (QStandardPaths::findExecutable("rsync").isEmpty())
-            QSKIP("rsync not found in PATH");
-
         TestDir src, dst;
         src.createFile("test.txt", "data");
 
@@ -272,9 +257,6 @@ private slots:
 
     void testCopyEmitsProgressChanged()
     {
-        if (QStandardPaths::findExecutable("rsync").isEmpty())
-            QSKIP("rsync not found in PATH");
-
         TestDir src, dst;
         src.createFile("large.bin", QByteArray(8 * 1024 * 1024, 'x'));
 
@@ -293,9 +275,6 @@ private slots:
 
     void testMoveFile()
     {
-        if (QStandardPaths::findExecutable("rsync").isEmpty())
-            QSKIP("rsync not found in PATH");
-
         TestDir src, dst;
         QString srcPath = src.path() + "/test.txt";
         src.createFile("test.txt", "hello");

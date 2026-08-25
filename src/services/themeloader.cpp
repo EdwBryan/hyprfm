@@ -13,7 +13,6 @@ QMap<QString, QColor> ThemeLoader::s_defaults = {
     {"subtext", QColor("#bac2de")}, {"muted", QColor("#6c7086")},
     {"accent", QColor("#89b4fa")}, {"success", QColor("#a6e3a1")},
     {"warning", QColor("#f9e2af")}, {"error", QColor("#f38ba8")},
-    {"purple", QColor("#cba6f7")},
 };
 
 ThemeLoader::ThemeLoader(QObject *parent) : QObject(parent), m_colors(s_defaults)

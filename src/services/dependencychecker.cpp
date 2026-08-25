@@ -184,15 +184,6 @@ void DependencyChecker::populate()
         })
     });
 
-    m_deps.append({
-        QStringLiteral("rsync"),
-        QStringLiteral("rsync"),
-        QStringLiteral("Fast copy/move with progress reporting."),
-        Kind::Tool, true, hasExecutable(QStringLiteral("rsync")),
-        {QStringLiteral("rsync")},
-        buildHints(QStringLiteral("rsync"))
-    });
-
     // ── Optional runtime tools ────────────────────────────────────────────
     m_deps.append({
         QStringLiteral("fd"),
