@@ -1,4 +1,5 @@
 build/
+result
 .cache/
 .superpowers/
 CMakeLists.txt.user
