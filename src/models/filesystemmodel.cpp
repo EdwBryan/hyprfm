@@ -23,6 +23,21 @@
 static QString runHostTool(const QString &program, const QStringList &arguments,
                            int timeoutMs = 3000);
 
+// Natural, case-insensitive ordering for names (file2 before file10). In the
+// "C"/POSIX locale QCollator degrades to a plain byte compare and ignores
+// numeric mode and case-insensitivity, so fall back to English collation
+// there; LANG is often unset in CI, containers and minimal setups.
+static QCollator nameCollator()
+{
+    QLocale locale;
+    if (locale.language() == QLocale::C)
+        locale = QLocale(QLocale::English);
+    QCollator collator(locale);
+    collator.setNumericMode(true);
+    collator.setCaseSensitivity(Qt::CaseInsensitive);
+    return collator;
+}
+
 namespace {
 
 // Shared MIME database: construction is cheap but keeping one instance
@@ -1007,9 +1022,7 @@ static void applyNaturalNameOrder(QFileInfoList &infos, QDir::SortFlags flags)
 {
     if ((flags & QDir::SortByMask) != QDir::Name)
         return;
-    QCollator collator;
-    collator.setNumericMode(true);
-    collator.setCaseSensitivity(Qt::CaseInsensitive);
+    QCollator collator = nameCollator();
     const bool dirsFirst = flags & QDir::DirsFirst;
     const bool byType = flags & QDir::Type;
     const bool reversed = flags & QDir::Reversed;
@@ -1209,9 +1222,7 @@ void FileSystemModel::applyRemoteReload(const QString &rootPath, const QByteArra
         }
     }
 
-    QCollator collator;
-    collator.setNumericMode(true);                  // file2 before file10
-    collator.setCaseSensitivity(Qt::CaseInsensitive);
+    QCollator collator = nameCollator();
     std::sort(entries.begin(), entries.end(), [this, &collator](const QVariantMap &lhs, const QVariantMap &rhs) {
         const bool lhsDir = lhs.value(QStringLiteral("isDir")).toBool();
         const bool rhsDir = rhs.value(QStringLiteral("isDir")).toBool();
@@ -1430,9 +1441,7 @@ void FileSystemModel::reloadTrash()
             m_trashEntries.append(entry);
     }
 
-    QCollator collator;
-    collator.setNumericMode(true);
-    collator.setCaseSensitivity(Qt::CaseInsensitive);
+    QCollator collator = nameCollator();
     std::sort(m_trashEntries.begin(), m_trashEntries.end(), [this, &collator](const QVariantMap &lhs, const QVariantMap &rhs) {
         const bool lhsDir = lhs.value("isDir").toBool();
         const bool rhsDir = rhs.value("isDir").toBool();

@@ -1037,26 +1037,22 @@ private slots:
         QTest::newRow("rar") << ".rar";
     }
 
+    // Real archives made by the matching tool; a zip renamed to .7z only
+    // worked with tools that sniff the content, which 7-Zip 23+ refuses.
     void testArchiveSupportFor7zAndRar()
     {
-        if (QStandardPaths::findExecutable("zip").isEmpty())
-            QSKIP("zip not found in PATH");
-
-        if (QStandardPaths::findExecutable("7z").isEmpty()
-                && QStandardPaths::findExecutable("bsdtar").isEmpty())
-            QSKIP("Neither 7z nor bsdtar found in PATH");
-
         QFETCH(QString, extension);
+        const QString tool = extension == ".7z" ? QStringLiteral("7z") : QStringLiteral("rar");
+        if (QStandardPaths::findExecutable(tool).isEmpty())
+            QSKIP(qPrintable(tool + " not found in PATH"));
 
         TestDir archiveDir;
         TestDir extractDir;
         archiveDir.createDir("payload");
         archiveDir.createFile("payload/inner.txt", "hello");
-
-        QVERIFY(runCommand("zip", {"-rq", "payload.zip", "payload"}, archiveDir.path()));
-
         const QString archivePath = archiveDir.path() + "/payload" + extension;
-        QVERIFY(QFile::copy(archiveDir.path() + "/payload.zip", archivePath));
+        QVERIFY(runCommand(tool, {"a", archivePath, "payload"}, archiveDir.path()));
+        QVERIFY(QFile::exists(archivePath));
 
         FileOperations ops;
         QVERIFY(FileOperations::isArchive(archivePath));
