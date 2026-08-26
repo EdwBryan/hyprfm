@@ -8,6 +8,11 @@
 # Needs the maintained fork — the original is archived and crashes on current
 # Hyprland ("layerSurface was not configured, but a buffer was attached"):
 #   yay -S wshowkeys-mao-rounded
+#
+# On a scaled output (anything but scale 1) the fork only repaints the top-left
+# 1/scale of its surfaces, so a held Ctrl or Super highlights just the upper
+# part of the cap. wshowkeys-damage-scale.patch next to this script fixes it;
+# without it, record on an unscaled monitor.
 set -eu
 
 command -v wshowkeys >/dev/null || {
