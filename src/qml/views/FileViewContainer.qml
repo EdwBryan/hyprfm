@@ -6,6 +6,11 @@ Item {
 
     // "grid" | "detailed" | "miller"
     property string viewMode: "grid"
+    readonly property string effectiveViewMode: {
+        if (viewMode === "list" || viewMode === "detailed") return "detailed"
+        if (viewMode === "miller") return "miller"
+        return "grid"
+    }
     property var fileModel: null
     property string currentPath: ""
 
@@ -17,8 +22,8 @@ Item {
     signal sortRequested(string column, bool ascending)
 
     function selectAll() {
-        if (viewMode === "grid") gridView.selectAll()
-        else if (viewMode === "miller") millerView.selectAll()
+        if (effectiveViewMode === "grid") gridView.selectAll()
+        else if (effectiveViewMode === "miller") millerView.selectAll()
         else detailedView.selectAll()
     }
 
@@ -36,7 +41,7 @@ Item {
     FileGridView {
         id: gridView
         anchors.fill: parent
-        visible: root.viewMode === "grid"
+        visible: root.effectiveViewMode === "grid"
         model: visible ? root.fileModel : null
         currentPath: root.currentPath
 
@@ -50,7 +55,7 @@ Item {
     FileDetailedView {
         id: detailedView
         anchors.fill: parent
-        visible: root.viewMode === "detailed"
+        visible: root.effectiveViewMode === "detailed"
         viewModel: visible ? root.fileModel : null
         currentPath: root.currentPath
 
@@ -65,7 +70,7 @@ Item {
     FileMillerView {
         id: millerView
         anchors.fill: parent
-        visible: root.viewMode === "miller"
+        visible: root.effectiveViewMode === "miller"
         fileModel: visible ? root.fileModel : null
         currentPath: root.currentPath
 

@@ -117,13 +117,19 @@ TabModel *TabListModel::tabAt(int index) const
 
 void TabListModel::setDefaultViewMode(const QString &mode)
 {
-    if (mode.isEmpty() || m_defaultViewMode == mode)
+    QString normalized = mode;
+    if (normalized == QStringLiteral("list"))
+        normalized = QStringLiteral("detailed");
+    else if (normalized != QStringLiteral("grid") && normalized != QStringLiteral("detailed") && normalized != QStringLiteral("miller"))
+        normalized = QStringLiteral("grid");
+
+    if (normalized.isEmpty() || m_defaultViewMode == normalized)
         return;
-    m_defaultViewMode = mode;
+    m_defaultViewMode = normalized;
     // Apply to tabs still on the built-in default (startup tab before session restore)
     for (TabModel *tab : m_tabs) {
         if (tab->viewMode() == QStringLiteral("grid"))
-            tab->setViewMode(mode);
+            tab->setViewMode(normalized);
     }
 }
 
