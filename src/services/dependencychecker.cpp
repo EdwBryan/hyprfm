@@ -318,6 +318,26 @@ void DependencyChecker::populate()
         })
     });
 
+    const bool gvfsMtpAvailable = hasExecutable(QStringLiteral("gio")) && hasAnyFile({
+        QStringLiteral("/usr/share/gvfs/mounts/mtp.mount"),
+        QStringLiteral("/usr/lib/gvfs/gvfsd-mtp"),
+        QStringLiteral("/usr/lib64/gvfs/gvfsd-mtp"),
+        QStringLiteral("/usr/libexec/gvfsd-mtp"),
+    });
+    m_deps.append({
+        QStringLiteral("gvfs-mtp"),
+        QStringLiteral("GVFS MTP backend"),
+        QStringLiteral("Browse Android phones connected in file-transfer (MTP) mode."),
+        Kind::Tool, false, gvfsMtpAvailable,
+        {QStringLiteral("mtp.mount"), QStringLiteral("gvfsd-mtp")},
+        buildHints(QStringLiteral("gvfs-mtp"), {
+            {QStringLiteral("debian"),    QStringLiteral("gvfs-backends")},
+            {QStringLiteral("ubuntu"),    QStringLiteral("gvfs-backends")},
+            {QStringLiteral("linuxmint"), QStringLiteral("gvfs-backends")},
+            {QStringLiteral("pop"),       QStringLiteral("gvfs-backends")},
+        })
+    });
+
     m_deps.append({
         QStringLiteral("usbmuxd"),
         QStringLiteral("usbmuxd"),

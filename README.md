@@ -181,7 +181,7 @@ The result lands in the repo root as `HyprFM-<version>-x86_64.AppImage`. The scr
 |---|---|
 | **Required (build)** | `cmake`, `ninja`, `qt6-base`, `qt6-declarative`, `qt6-svg` |
 | **Required (runtime)** | `qt6-base`, `qt6-declarative`, `qt6-svg`, `qt6-wayland`, `glib2`, `gvfs` (trash view), `xdg-utils` |
-| **Optional** | `kwindowsystem` / `KF6WindowSystem` (native KDE blur), `wl-clipboard` (clipboard), `fd` (fast search), `bat` (syntax highlighting), `gvfs-smb` (SMB), `ffmpeg` (video thumbnails), `udisks2` (device mounting), `poppler` / `poppler-utils` (PDF previews via `pdftoppm`) |
+| **Optional** | `kwindowsystem` / `KF6WindowSystem` (native KDE blur), `wl-clipboard` (clipboard), `fd` (fast search), `bat` (syntax highlighting), `gvfs-smb` (SMB), `gvfs-mtp` (Android/MTP phones), `ffmpeg` (video thumbnails), `udisks2` (device mounting), `poppler` / `poppler-utils` (PDF previews via `pdftoppm`) |
 
 ---
 

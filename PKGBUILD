@@ -30,6 +30,7 @@ optdepends=(
     'fd: fast recursive search (falls back to a built-in walker)'
     'bat: syntax-highlighted text previews'
     'gvfs-smb: SMB/CIFS remote browsing support'
+    'gvfs-mtp: Android phones (MTP) in the sidebar'
     'ffmpeg: video thumbnails and audio/video metadata (via ffprobe)'
     'poppler: PDF thumbnails, previews, and metadata (via pdftoppm/pdfinfo)'
     'perl-image-exiftool: EXIF metadata for images (via exiftool)'

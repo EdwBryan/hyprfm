@@ -260,6 +260,7 @@ bool isMobileDeviceScheme(const QString &scheme)
     static const QSet<QString> schemes = {
         QStringLiteral("afc"),
         QStringLiteral("gphoto2"),
+        QStringLiteral("mtp"),   // Android in file-transfer mode (gvfs-mtp)
     };
     return schemes.contains(scheme);
 }
@@ -631,7 +632,8 @@ void DeviceModel::refresh()
             int usage = 0;
 
             GDrive *drive = g_mount_get_drive(mount);
-            const bool removable = isRemovableDrive(drive) || uri.startsWith(QLatin1String("afc://"));
+            const bool removable = isRemovableDrive(drive) || uri.startsWith(QLatin1String("afc://"))
+                || uri.startsWith(QLatin1String("mtp://"));
             if (drive)
                 g_object_unref(drive);
 
