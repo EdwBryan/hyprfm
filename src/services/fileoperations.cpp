@@ -1056,29 +1056,29 @@ void FileOperations::emitAggregatedState()
     emit activeTransfersChanged();
 }
 
-void FileOperations::copyFiles(const QStringList &sources, const QString &destination)
+int FileOperations::copyFiles(const QStringList &sources, const QString &destination)
 {
-    transferResolvedItems(transferPlan(sources, destination), false);
+    return transferResolvedItems(transferPlan(sources, destination), false);
 }
 
-void FileOperations::copyResolvedItems(const QVariantList &operations)
+int FileOperations::copyResolvedItems(const QVariantList &operations)
 {
-    transferResolvedItems(operations, false);
+    return transferResolvedItems(operations, false);
 }
 
-void FileOperations::moveFiles(const QStringList &sources, const QString &destination)
+int FileOperations::moveFiles(const QStringList &sources, const QString &destination)
 {
-    transferResolvedItems(transferPlan(sources, destination), true);
+    return transferResolvedItems(transferPlan(sources, destination), true);
 }
 
-void FileOperations::moveResolvedItems(const QVariantList &operations)
+int FileOperations::moveResolvedItems(const QVariantList &operations)
 {
-    transferResolvedItems(operations, true);
+    return transferResolvedItems(operations, true);
 }
 
-void FileOperations::trashFiles(const QStringList &paths)
+int FileOperations::trashFiles(const QStringList &paths)
 {
-    startSimpleOperation(
+    return startSimpleOperation(
         QString("Trashing %1 item(s)...").arg(paths.size()), paths,
         [paths](ProgressReporter report) -> QString {
             QString lastError;
@@ -1120,9 +1120,9 @@ void FileOperations::trashFiles(const QStringList &paths)
         });
 }
 
-void FileOperations::restoreFromTrash(const QStringList &paths)
+int FileOperations::restoreFromTrash(const QStringList &paths)
 {
-    startSimpleOperation(
+    return startSimpleOperation(
         QString("Restoring %1 item(s)...").arg(paths.size()), paths,
         [paths](ProgressReporter report) -> QString {
             QString lastError;
@@ -1284,9 +1284,9 @@ QString FileOperations::uniqueNameForDestination(const QString &destinationDir, 
     return {};
 }
 
-void FileOperations::deleteFiles(const QStringList &paths)
+int FileOperations::deleteFiles(const QStringList &paths)
 {
-    startSimpleOperation(
+    return startSimpleOperation(
         QString("Deleting %1 item(s)...").arg(paths.size()), paths,
         [paths](ProgressReporter report) -> QString {
             QString lastError;
@@ -1319,11 +1319,11 @@ void FileOperations::deleteFiles(const QStringList &paths)
         });
 }
 
-void FileOperations::transferResolvedItems(const QVariantList &operations, bool moveOperation)
+int FileOperations::transferResolvedItems(const QVariantList &operations, bool moveOperation)
 {
     if (operations.isEmpty()) {
         emit operationFinished(true, QString());
-        return;
+        return -1;
     }
 
     QVariantList preparedOperations;
@@ -1337,17 +1337,17 @@ void FileOperations::transferResolvedItems(const QVariantList &operations, bool 
 
         if (sourcePath.isEmpty() || targetPath.isEmpty()) {
             emit operationFinished(false, "Transfer operation is missing a source or destination path");
-            return;
+            return -1;
         }
 
         if (sourcePath == targetPath) {
             emit operationFinished(false, QString("Source and destination are the same for %1").arg(locationFileName(sourcePath)));
-            return;
+            return -1;
         }
 
         if (targetPath.startsWith(sourcePath + QLatin1Char('/'))) {
             emit operationFinished(false, QString("Cannot copy %1 into itself").arg(locationFileName(sourcePath)));
-            return;
+            return -1;
         }
 
         item["sourcePath"] = sourcePath;
@@ -1358,7 +1358,7 @@ void FileOperations::transferResolvedItems(const QVariantList &operations, bool 
         preparedOperations.append(item);
     }
 
-    startGioTransfer(preparedOperations, moveOperation);
+    return startGioTransfer(preparedOperations, moveOperation);
 }
 
 void FileOperations::resetTransferState()
@@ -1614,9 +1614,9 @@ QVariantList FileOperations::breadcrumbSegments(const QString &path) const
     return buildBreadcrumbs(path);
 }
 
-void FileOperations::emptyTrash()
+int FileOperations::emptyTrash()
 {
-    startSimpleOperation(
+    return startSimpleOperation(
         QStringLiteral("Emptying trash..."), {},
         [](ProgressReporter report) -> QString {
             // Inside a Flatpak the GLib trash:// URI resolves to the
@@ -1931,9 +1931,9 @@ void FileOperations::openNewWindow(const QString &dirPath)
         emit operationFinished(false, QStringLiteral("Failed to open a new window"));
 }
 
-void FileOperations::compressFiles(const QStringList &paths, const QString &format)
+int FileOperations::compressFiles(const QStringList &paths, const QString &format)
 {
-    if (paths.isEmpty()) return;
+    if (paths.isEmpty()) return -1;
 
     // Determine output name from first file's parent + name
     QFileInfo first(paths.first());
@@ -1990,11 +1990,11 @@ void FileOperations::compressFiles(const QStringList &paths, const QString &form
         for (const auto &p : paths)
             args.append(QFileInfo(p).fileName());
     } else {
-        return;
+        return -1;
     }
 
     const QString statusText = QString("Compressing %1 item(s)...").arg(paths.size());
-    startSimpleOperation(statusText, {outputPath},
+    return startSimpleOperation(statusText, {outputPath},
         [paths, parentDir, program, args](ProgressReporter report) -> QString {
             // Pre-count files for progress
             int totalFiles = 0;
@@ -2040,12 +2040,12 @@ void FileOperations::compressFiles(const QStringList &paths, const QString &form
         });
 }
 
-void FileOperations::extractArchive(const QString &archivePath, const QString &destination)
+int FileOperations::extractArchive(const QString &archivePath, const QString &destination)
 {
     QString program;
     QStringList args;
     if (!archiveExtractCommand(archivePath, destination, &program, &args))
-        return;
+        return -1;
 
     // Add verbose flag for progress tracking
     QStringList verboseArgs = args;
@@ -2060,7 +2060,7 @@ void FileOperations::extractArchive(const QString &archivePath, const QString &d
     QStringList listArgs;
     const bool canList = archiveListCommand(archivePath, &listProg, &listArgs);
 
-    startSimpleOperation(QStringLiteral("Extracting..."), {destination},
+    return startSimpleOperation(QStringLiteral("Extracting..."), {destination},
         [program, verboseArgs, canList, listProg, listArgs](ProgressReporter report) -> QString {
             int totalFiles = 0;
             if (canList) {
@@ -2099,6 +2099,40 @@ void FileOperations::extractArchive(const QString &archivePath, const QString &d
                 return QStringLiteral("Extraction failed");
             return {};
         });
+}
+
+// Opening an archive extracts it into a fresh folder next to it. Extracting
+// into the parent directory ran unzip -o / 7z -aoa there, which silently
+// replaced unrelated files with the same names. Returns the created folder,
+// or an empty string after reporting the failure.
+QString FileOperations::newExtractionFolder(const QString &archivePath)
+{
+    const QString normalized = normalizeLocation(archivePath);
+    const QString parent = parentLocation(normalized);
+    QString base = locationFileName(normalized);
+    static const QStringList suffixes = {
+        QStringLiteral(".tar.gz"), QStringLiteral(".tar.xz"), QStringLiteral(".tar.bz2"),
+        QStringLiteral(".tar.zst"), QStringLiteral(".tgz"), QStringLiteral(".txz"),
+        QStringLiteral(".tbz2"), QStringLiteral(".tar"), QStringLiteral(".zip"),
+        QStringLiteral(".7z"), QStringLiteral(".rar"), QStringLiteral(".gz"),
+        QStringLiteral(".xz"), QStringLiteral(".bz2"), QStringLiteral(".zst")};
+    for (const QString &suffix : suffixes) {
+        if (base.endsWith(suffix, Qt::CaseInsensitive)) {
+            base.chop(suffix.size());
+            break;
+        }
+    }
+    if (base.isEmpty())
+        base = QStringLiteral("extracted");
+
+    const QString dir = joinLocation(parent, uniqueNameForDestination(parent, base, {}));
+    QString error;
+    if (!makeDirectorySync(dir, &error)) {
+        emit operationFinished(false, error.isEmpty()
+            ? QStringLiteral("Could not create a folder to extract into") : error);
+        return {};
+    }
+    return dir;
 }
 
 QString FileOperations::archiveRootFolder(const QString &archivePath)
@@ -2183,7 +2217,7 @@ void FileOperations::cleanupTransfer(int transferId)
     emitAggregatedState();
 }
 
-void FileOperations::startSimpleOperation(const QString &statusText, const QStringList &changedPaths,
+int FileOperations::startSimpleOperation(const QString &statusText, const QStringList &changedPaths,
                                            std::function<QString(ProgressReporter)> work)
 {
     const int id = m_nextTransferId++;
@@ -2221,7 +2255,7 @@ void FileOperations::startSimpleOperation(const QString &statusText, const QStri
                 emitChangedPaths(t->changedPaths);
             }
             m_progress = 1.0;
-            emit operationFinished(ok, error);
+            emit operationFinished(ok, error, id);
             cleanupTransfer(id);
         }, Qt::QueuedConnection);
         runner->deleteLater();
@@ -2229,9 +2263,10 @@ void FileOperations::startSimpleOperation(const QString &statusText, const QStri
 
     connect(thread, &QThread::finished, thread, &QObject::deleteLater);
     thread->start();
+    return id;
 }
 
-void FileOperations::startGioTransfer(const QVariantList &operations, bool moveOperation)
+int FileOperations::startGioTransfer(const QVariantList &operations, bool moveOperation)
 {
     QList<GioTransferWorker::TransferItem> items;
     int itemCount = 0;
@@ -2301,7 +2336,7 @@ void FileOperations::startGioTransfer(const QVariantList &operations, bool moveO
         }
         if (success)
             m_progress = 1.0;
-        emit operationFinished(success, error);
+        emit operationFinished(success, error, id);
         cleanupTransfer(id);
     });
 
@@ -2311,6 +2346,7 @@ void FileOperations::startGioTransfer(const QVariantList &operations, bool moveO
     QMetaObject::invokeMethod(worker, [worker, items, moveOperation]() {
         worker->execute(items, moveOperation);
     }, Qt::QueuedConnection);
+    return id;
 }
 
 void FileOperations::runProcess(const QString &program, const QStringList &args)

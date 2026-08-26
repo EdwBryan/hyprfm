@@ -593,26 +593,27 @@ ApplicationWindow {
             }
         }
 
+        // Wait for this operation's id, not for whichever transfer finishes
+        // next; several can run at once.
+        var opId = -1
+        var onFinished = null
         if (clearClipboardOnSuccess) {
-            fileOps.operationFinished.connect(function(success) {
-                fileOps.operationFinished.disconnect(arguments.callee)
+            onFinished = function(success, error, id) {
+                if (id !== opId) return
+                fileOps.operationFinished.disconnect(onFinished)
                 if (success)
                     clipboard.clear()
-            })
+            }
+            fileOps.operationFinished.connect(onFinished)
         }
 
-        if (usesRemotePath) {
-            if (moveOperation)
-                fileOps.moveResolvedItems(items)
-            else
-                fileOps.copyResolvedItems(items)
-            return
-        }
-
-        if (moveOperation)
-            undoManager.moveResolvedItems(items)
+        if (usesRemotePath)
+            opId = moveOperation ? fileOps.moveResolvedItems(items) : fileOps.copyResolvedItems(items)
         else
-            undoManager.copyResolvedItems(items)
+            opId = moveOperation ? undoManager.moveResolvedItems(items) : undoManager.copyResolvedItems(items)
+
+        if (onFinished && opId < 0)   // failed before it started; nothing will call back
+            fileOps.operationFinished.disconnect(onFinished)
     }
 
     function openTransferConflict(index) {
@@ -3296,15 +3297,23 @@ ApplicationWindow {
         if (isDirectory) {
             root.navigatePaneTo(pane, filePath)
         } else if (fileOps.isArchive(filePath)) {
-            var dir = filePath.substring(0, filePath.lastIndexOf("/"))
-            var rootFolder = fileOps.archiveRootFolder(filePath)
-            fileOps.extractArchive(filePath, dir)
-            var conn = fileOps.operationFinished.connect(function(success) {
-                fileOps.operationFinished.disconnect(arguments.callee)
-                if (success) {
-                    root.navigatePaneTo(pane, rootFolder ? dir + "/" + rootFolder : dir)
-                }
-            })
+            // Into a fresh folder next to the archive: extracting into the
+            // parent directory would silently replace files with the same
+            // names ("Extract Here" in the context menu still does that, on
+            // purpose).
+            var dest = fileOps.newExtractionFolder(filePath)
+            if (!dest)
+                return
+            var opId = fileOps.extractArchive(filePath, dest)
+            if (opId < 0)
+                return
+            var onExtracted = function(success, error, id) {
+                if (id !== opId) return
+                fileOps.operationFinished.disconnect(onExtracted)
+                if (success)
+                    root.navigatePaneTo(pane, dest)
+            }
+            fileOps.operationFinished.connect(onExtracted)
         } else {
             fileOps.openFile(filePath)
             recentFiles.addRecent(filePath)

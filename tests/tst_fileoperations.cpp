@@ -645,6 +645,41 @@ private slots:
         QCOMPARE(f.readAll(), QByteArray("precious"));
     }
 
+    // Two operations in flight report their own ids, so a caller waiting on
+    // one cannot be satisfied by the other finishing first.
+    void testOperationFinishedCarriesTheOperationId()
+    {
+        TestDir dir;
+        dir.createFile("a.txt", "a");
+        dir.createFile("b.txt", "b");
+        FileOperations ops;
+        QSignalSpy spy(&ops, &FileOperations::operationFinished);
+        const int first = ops.deleteFiles({dir.path() + "/a.txt"});
+        const int second = ops.deleteFiles({dir.path() + "/b.txt"});
+        QVERIFY(first >= 0 && second >= 0 && first != second);
+        QTRY_COMPARE_WITH_TIMEOUT(spy.count(), 2, 10000);
+        QSet<int> ids{spy.at(0).at(2).toInt(), spy.at(1).at(2).toInt()};
+        QCOMPARE(ids, QSet<int>({first, second}));
+        QCOMPARE(ops.copyResolvedItems({}), -1);   // synchronous "nothing to do"
+    }
+
+    // Opening an archive extracts next to it into a folder that did not
+    // exist before, never over the parent directory's files.
+    void testNewExtractionFolderNeverReusesAnExistingOne()
+    {
+        TestDir dir;
+        dir.createFile("photos.tar.gz", "not really an archive");
+        dir.createDir("photos");
+        dir.createFile("photos/keep.txt", "keep");
+        FileOperations ops;
+        const QString dest = ops.newExtractionFolder(dir.path() + "/photos.tar.gz");
+        QVERIFY(!dest.isEmpty());
+        QVERIFY(QFileInfo(dest).isDir());
+        QVERIFY(dest != dir.path() + "/photos");
+        QVERIFY(dest.startsWith(dir.path() + "/photos"));
+        QVERIFY(dir.exists("photos/keep.txt"));
+    }
+
     void testCreateFolder()
     {
         TestDir dir;

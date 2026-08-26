@@ -35,11 +35,11 @@ public:
     Q_INVOKABLE void redo();
 
     // Undoable wrappers around FileOperations
-    Q_INVOKABLE void copyFiles(const QStringList &sources, const QString &destination);
-    Q_INVOKABLE void copyResolvedItems(const QVariantList &operations);
-    Q_INVOKABLE void moveFiles(const QStringList &sources, const QString &destination);
-    Q_INVOKABLE void moveResolvedItems(const QVariantList &operations);
-    Q_INVOKABLE void trashFiles(const QStringList &paths);
+    Q_INVOKABLE int copyFiles(const QStringList &sources, const QString &destination);
+    Q_INVOKABLE int copyResolvedItems(const QVariantList &operations);
+    Q_INVOKABLE int moveFiles(const QStringList &sources, const QString &destination);
+    Q_INVOKABLE int moveResolvedItems(const QVariantList &operations);
+    Q_INVOKABLE int trashFiles(const QStringList &paths);
     Q_INVOKABLE bool rename(const QString &path, const QString &newName);
     Q_INVOKABLE QVariantMap renameResolvedItems(const QVariantList &operations);
     Q_INVOKABLE void createFolder(const QString &parentPath, const QString &name);

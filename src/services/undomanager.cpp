@@ -160,63 +160,78 @@ QStringList UndoManager::computeCreatedPaths(const QStringList &sources, const Q
 
 // ── Undoable wrappers ────────────────────────────────────────────────────
 
-void UndoManager::copyFiles(const QStringList &sources, const QString &destination)
+int UndoManager::copyFiles(const QStringList &sources, const QString &destination)
 {
-    copyResolvedItems(buildOperations(sources, computeCreatedPaths(sources, destination)));
+    return copyResolvedItems(buildOperations(sources, computeCreatedPaths(sources, destination)));
 }
 
-void UndoManager::copyResolvedItems(const QVariantList &operations)
+int UndoManager::copyResolvedItems(const QVariantList &operations)
 {
     const QVariantList preparedOperations = prepareOperations(operations, m_fileOps);
     const QStringList sourcePaths = operationsField(preparedOperations, "sourcePath");
     const QStringList targetPaths = operationsField(preparedOperations, "targetPath");
     const QStringList backupPaths = operationsField(preparedOperations, "backupPath");
 
-    m_fileOps->copyResolvedItems(preparedOperations);
+    const int opId = m_fileOps->copyResolvedItems(preparedOperations);
+    if (opId < 0)
+        return opId;   // failed synchronously; nothing ran, nothing to record
 
     auto conn = std::make_shared<QMetaObject::Connection>();
     *conn = connect(m_fileOps, &FileOperations::operationFinished,
-                    this, [this, sourcePaths, targetPaths, backupPaths, conn](bool success, const QString &) {
+                    this, [this, sourcePaths, targetPaths, backupPaths, conn, opId](bool success, const QString &, int id) {
+        if (id != opId)
+            return;
         disconnect(*conn);
         if (success)
             record({UndoRecord::Copy, sourcePaths, {}, {}, {}, targetPaths, backupPaths});
     });
+    return opId;
 }
 
-void UndoManager::moveFiles(const QStringList &sources, const QString &destination)
+int UndoManager::moveFiles(const QStringList &sources, const QString &destination)
 {
-    moveResolvedItems(buildOperations(sources, computeCreatedPaths(sources, destination)));
+    return moveResolvedItems(buildOperations(sources, computeCreatedPaths(sources, destination)));
 }
 
-void UndoManager::moveResolvedItems(const QVariantList &operations)
+int UndoManager::moveResolvedItems(const QVariantList &operations)
 {
     const QVariantList preparedOperations = prepareOperations(operations, m_fileOps);
     const QStringList sourcePaths = operationsField(preparedOperations, "sourcePath");
     const QStringList targetPaths = operationsField(preparedOperations, "targetPath");
     const QStringList backupPaths = operationsField(preparedOperations, "backupPath");
 
-    m_fileOps->moveResolvedItems(preparedOperations);
+    const int opId = m_fileOps->moveResolvedItems(preparedOperations);
+    if (opId < 0)
+        return opId;   // failed synchronously; nothing ran, nothing to record
 
     auto conn = std::make_shared<QMetaObject::Connection>();
     *conn = connect(m_fileOps, &FileOperations::operationFinished,
-                    this, [this, sourcePaths, targetPaths, backupPaths, conn](bool success, const QString &) {
+                    this, [this, sourcePaths, targetPaths, backupPaths, conn, opId](bool success, const QString &, int id) {
+        if (id != opId)
+            return;
         disconnect(*conn);
         if (success)
             record({UndoRecord::Move, sourcePaths, {}, {}, {}, targetPaths, backupPaths});
     });
+    return opId;
 }
 
-void UndoManager::trashFiles(const QStringList &paths)
+int UndoManager::trashFiles(const QStringList &paths)
 {
-    m_fileOps->trashFiles(paths);
+    const int opId = m_fileOps->trashFiles(paths);
+    if (opId < 0)
+        return opId;   // failed synchronously; nothing ran, nothing to record
 
     auto conn = std::make_shared<QMetaObject::Connection>();
     *conn = connect(m_fileOps, &FileOperations::operationFinished,
-                    this, [this, paths, conn](bool success, const QString &) {
+                    this, [this, paths, conn, opId](bool success, const QString &, int id) {
+        if (id != opId)
+            return;
         disconnect(*conn);
         if (success)
             record({UndoRecord::Trash, paths, {}, {}, {}, {}, {}});
     });
+    return opId;
 }
 
 bool UndoManager::rename(const QString &path, const QString &newName)
@@ -276,31 +291,37 @@ void UndoManager::undo()
 void UndoManager::executeUndo(const UndoRecord &rec)
 {
     switch (rec.type) {
-    case UndoRecord::Copy:
-        if (hasBackupPaths(rec.backupPaths)) {
+    case UndoRecord::Copy: {
+        const int opId = m_fileOps->deleteFiles(rec.createdPaths);
+        if (opId >= 0 && hasBackupPaths(rec.backupPaths)) {
             auto conn = std::make_shared<QMetaObject::Connection>();
             *conn = connect(m_fileOps, &FileOperations::operationFinished,
-                            this, [this, rec, conn](bool success, const QString &) {
+                            this, [this, rec, conn, opId](bool success, const QString &, int id) {
+                if (id != opId)
+                    return;
                 disconnect(*conn);
                 if (success)
                     restoreBackupPaths(rec.createdPaths, rec.backupPaths);
             });
         }
-        m_fileOps->deleteFiles(rec.createdPaths);
         break;
+    }
 
-    case UndoRecord::Move:
-        if (hasBackupPaths(rec.backupPaths)) {
+    case UndoRecord::Move: {
+        const int opId = m_fileOps->moveResolvedItems(buildOperations(rec.createdPaths, rec.sourcePaths));
+        if (opId >= 0 && hasBackupPaths(rec.backupPaths)) {
             auto conn = std::make_shared<QMetaObject::Connection>();
             *conn = connect(m_fileOps, &FileOperations::operationFinished,
-                            this, [this, rec, conn](bool success, const QString &) {
+                            this, [this, rec, conn, opId](bool success, const QString &, int id) {
+                if (id != opId)
+                    return;
                 disconnect(*conn);
                 if (success)
                     restoreBackupPaths(rec.createdPaths, rec.backupPaths);
             });
         }
-        m_fileOps->moveResolvedItems(buildOperations(rec.createdPaths, rec.sourcePaths));
         break;
+    }
 
     case UndoRecord::Rename: {
         m_fileOps->renameResolvedItems(buildOperations(rec.createdPaths, rec.sourcePaths));

@@ -41,19 +41,19 @@ public:
     Q_INVOKABLE void resumeTransfer(int transferId = -1);
     Q_INVOKABLE void cancelTransfer(int transferId = -1);
 
-    Q_INVOKABLE void copyFiles(const QStringList &sources, const QString &destination);
-    Q_INVOKABLE void copyResolvedItems(const QVariantList &operations);
-    Q_INVOKABLE void moveFiles(const QStringList &sources, const QString &destination);
-    Q_INVOKABLE void moveResolvedItems(const QVariantList &operations);
-    Q_INVOKABLE void trashFiles(const QStringList &paths);
-    Q_INVOKABLE void restoreFromTrash(const QStringList &paths);
+    Q_INVOKABLE int copyFiles(const QStringList &sources, const QString &destination);
+    Q_INVOKABLE int copyResolvedItems(const QVariantList &operations);
+    Q_INVOKABLE int moveFiles(const QStringList &sources, const QString &destination);
+    Q_INVOKABLE int moveResolvedItems(const QVariantList &operations);
+    Q_INVOKABLE int trashFiles(const QStringList &paths);
+    Q_INVOKABLE int restoreFromTrash(const QStringList &paths);
     Q_INVOKABLE bool isTrashPath(const QString &path) const;
     Q_INVOKABLE QString trashFilesPathFor(const QString &path) const;
     Q_INVOKABLE QVariantList transferPlan(const QStringList &sources, const QString &destination) const;
     Q_INVOKABLE QString uniqueNameForDestination(const QString &destinationDir, const QString &desiredName,
                                                  const QStringList &blockedNames = {}) const;
     QString conflictBackupPath(const QString &targetPath) const;
-    Q_INVOKABLE void deleteFiles(const QStringList &paths);
+    Q_INVOKABLE int deleteFiles(const QStringList &paths);
     Q_INVOKABLE bool rename(const QString &path, const QString &newName);
     Q_INVOKABLE QVariantMap renameResolvedItems(const QVariantList &operations);
     Q_INVOKABLE void createFolder(const QString &parentPath, const QString &name);
@@ -65,7 +65,7 @@ public:
     Q_INVOKABLE QString parentPath(const QString &path) const;
     Q_INVOKABLE QString displayNameForPath(const QString &path) const;
     Q_INVOKABLE QVariantList breadcrumbSegments(const QString &path) const;
-    Q_INVOKABLE void emptyTrash();
+    Q_INVOKABLE int emptyTrash();
     Q_INVOKABLE void openFileWith(const QString &path, const QString &desktopFile);
     static QStringList desktopExecArguments(const QString &execLine, const QString &file);
     Q_INVOKABLE bool hasClipboardImage() const;
@@ -74,8 +74,9 @@ public:
     Q_INVOKABLE void openInTerminal(const QString &dirPath);
     Q_INVOKABLE void runCustomAction(const QString &command, const QStringList &paths);
     Q_INVOKABLE void openNewWindow(const QString &dirPath);
-    Q_INVOKABLE void compressFiles(const QStringList &paths, const QString &format);
-    Q_INVOKABLE void extractArchive(const QString &archivePath, const QString &destination);
+    Q_INVOKABLE int compressFiles(const QStringList &paths, const QString &format);
+    Q_INVOKABLE int extractArchive(const QString &archivePath, const QString &destination);
+    Q_INVOKABLE QString newExtractionFolder(const QString &archivePath);
     Q_INVOKABLE static bool isArchive(const QString &path);
     Q_INVOKABLE QString archiveRootFolder(const QString &archivePath);
     Q_INVOKABLE void setWallpaper(const QString &path);
@@ -92,7 +93,10 @@ signals:
     void currentFileChanged();
     void activeTransfersChanged();
     void pathsChanged(const QStringList &paths);
-    void operationFinished(bool success, const QString &error);
+    // operationId matches the value returned by the operation that started
+    // it (-1 for synchronous failures), so callers waiting on one operation
+    // are not satisfied by another one finishing first.
+    void operationFinished(bool success, const QString &error, int operationId = -1);
 
 private:
     struct ActiveTransfer {
@@ -109,7 +113,7 @@ private:
         QStringList targetPaths;
     };
 
-    void transferResolvedItems(const QVariantList &operations, bool moveOperation);
+    int transferResolvedItems(const QVariantList &operations, bool moveOperation);
     void resetTransferState();
     void setProgressValue(double progress, const QString &speed = {}, const QString &eta = {});
     void setPendingChangedPaths(const QStringList &paths);
@@ -118,9 +122,9 @@ private:
     void runProcess(const QString &program, const QStringList &args);
     QByteArray clipboardImageData() const;
     QString uniqueImagePastePath(const QString &destinationDir) const;
-    void startGioTransfer(const QVariantList &operations, bool moveOperation);
+    int startGioTransfer(const QVariantList &operations, bool moveOperation);
     using ProgressReporter = std::function<void(int current, int total, const QString &fileName)>;
-    void startSimpleOperation(const QString &statusText, const QStringList &changedPaths,
+    int startSimpleOperation(const QString &statusText, const QStringList &changedPaths,
                               std::function<QString(ProgressReporter)> work);
     void cleanupTransfer(int transferId);
     void emitAggregatedState();
