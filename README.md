@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="dist/hyprfm.svg" width="96" alt="HyprFM logo"/>
+<img src="dist/io.github.soyeb_jim285.HyprFM.svg" width="96" alt="HyprFM logo"/>
 
 # HyprFM
 
