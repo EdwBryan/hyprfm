@@ -641,7 +641,7 @@ private slots:
         ConfigManager mgr(path);
         QCOMPARE(mgr.theme(), QString("custom"));
         QCOMPARE(mgr.fontFamily(), QString("Inter"));
-        QCOMPARE(mgr.defaultView(), QString("list"));
+        QCOMPARE(mgr.defaultView(), QString("detailed"));
         QCOMPARE(mgr.showHidden(), true);
         QCOMPARE(mgr.sortBy(), QString("size"));
         QCOMPARE(mgr.sortAscending(), false);
