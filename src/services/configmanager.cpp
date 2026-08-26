@@ -6,6 +6,32 @@
 #include <QFile>
 #include <QKeySequence>
 #include <QSaveFile>
+#include <sstream>
+
+namespace {
+
+// Write the document atomically: a crash or full disk mid-write must not
+// leave a truncated config.toml behind (the sample writer already does this).
+bool writeConfigDocument(const QString &path, const toml::table &config)
+{
+    std::ostringstream out;
+    out << config;
+    const std::string text = out.str();
+
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        qWarning() << "Could not open config for writing:" << path << file.errorString();
+        return false;
+    }
+    file.write(text.data(), qint64(text.size()));
+    if (!file.commit()) {
+        qWarning() << "Could not write config:" << path << file.errorString();
+        return false;
+    }
+    return true;
+}
+
+} // namespace
 #include <QDir>
 #include <QDebug>
 #include <QFileInfo>
@@ -13,7 +39,6 @@
 #include <QJsonDocument>
 #include <QJsonObject>
 #include <QStandardPaths>
-#include <fstream>
 
 namespace {
 
@@ -297,18 +322,12 @@ void ConfigManager::loadConfig()
         // Parse before touching any member: a broken file (a duplicated table,
         // a typo) must leave the last good configuration in effect.
         auto config = toml::parse_file(m_configPath.toStdString());
-        m_fontFamily.clear();
-        m_transparencyEnabled = true;
-        m_transparencyLevel = 1.0;
-        m_animationsEnabled = true;
-        m_animDurationFast = 100;
-        m_animDuration = 200;
-        m_animDurationSlow = 350;
-        m_animCurveEnter = QStringLiteral("OutCubic");
-        m_animCurveExit = QStringLiteral("InCubic");
-        m_animCurveTransition = QStringLiteral("Bezier");
-        m_showWindowControlsExplicit = false;
-        m_shortcuts = s_defaultShortcuts;
+        // Every key that is not in the file goes back to its default, so
+        // deleting a line from config.toml takes effect on reload instead of
+        // leaving the old value in memory. The window-controls default comes
+        // from the compositor at runtime, not from the file; keep it.
+        setDefaults();
+        m_showWindowControls = m_showWindowControlsRuntimeDefault;
 
 
         if (auto v = config["general"]["theme"].value<std::string>())
@@ -511,11 +530,7 @@ void ConfigManager::saveMillerFractions(double parent, double current)
     config.insert_or_assign("miller_view", toml::table{{"parent_fraction", m_millerParent},
                                                        {"current_fraction", m_millerCurrent}});
 
-    std::ofstream ofs(m_configPath.toStdString());
-    if (ofs.is_open()) {
-        ofs << config;
-        ofs.close();
-    }
+    writeConfigDocument(m_configPath, config);
 
     if (QFile::exists(m_configPath)) {
         m_configModified = QFileInfo(m_configPath).lastModified();
@@ -775,11 +790,7 @@ void ConfigManager::saveListColumns(const QStringList &columns, const QVariantMa
     config.insert_or_assign("list_view", toml::table{{"columns", std::move(cols)},
                                                      {"column_widths", std::move(widthTable)}});
 
-    std::ofstream ofs(m_configPath.toStdString());
-    if (ofs.is_open()) {
-        ofs << config;
-        ofs.close();
-    }
+    writeConfigDocument(m_configPath, config);
 
     if (QFile::exists(m_configPath)) {
         m_configModified = QFileInfo(m_configPath).lastModified();
@@ -821,6 +832,7 @@ bool ConfigManager::showWindowControls() const { return m_showWindowControls; }
 
 void ConfigManager::setShowWindowControlsDefault(bool value)
 {
+    m_showWindowControlsRuntimeDefault = value;
     if (!m_showWindowControlsExplicit)
         m_showWindowControls = value;
 }
@@ -1075,11 +1087,7 @@ void ConfigManager::saveSettings(const QVariantMap &settings)
             config.insert_or_assign("window", std::move(windowTbl));
     }
 
-    std::ofstream ofs(m_configPath.toStdString());
-    if (ofs.is_open()) {
-        ofs << config;
-        ofs.close();
-    }
+    writeConfigDocument(m_configPath, config);
 
     if (QFile::exists(m_configPath)) {
         // Our own write, not an external edit — keep the stamp in sync so the
@@ -1205,11 +1213,7 @@ void ConfigManager::saveShortcuts(const QVariantMap &shortcuts)
 
     config.insert_or_assign("shortcuts", std::move(shortcutTable));
 
-    std::ofstream ofs(m_configPath.toStdString());
-    if (ofs.is_open()) {
-        ofs << config;
-        ofs.close();
-    }
+    writeConfigDocument(m_configPath, config);
 
     if (QFile::exists(m_configPath)) {
         // Our own write, not an external edit — keep the stamp in sync so the
@@ -1252,11 +1256,7 @@ void ConfigManager::saveBookmarks(const QStringList &paths, const QVariantMap &n
     config.insert_or_assign("bookmarks", std::move(bookmarksTable));
 
     // Write back
-    std::ofstream ofs(m_configPath.toStdString());
-    if (ofs.is_open()) {
-        ofs << config;
-        ofs.close();
-    }
+    writeConfigDocument(m_configPath, config);
 
     if (QFile::exists(m_configPath)) {
         // Our own write, not an external edit — keep the stamp in sync so the

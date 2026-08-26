@@ -46,6 +46,28 @@ private slots:
         QCOMPARE(mgr.sidebarPosition(), QString("left"));
     }
 
+    // Deleting a key from config.toml must bring its default back on reload.
+    void testReloadResetsRemovedKeys()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.path() + "/config.toml";
+        auto write = [&](const QByteArray &text) {
+            QFile f(path);
+            QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Truncate));
+            f.write(text);
+        };
+        write("[sidebar]\nwidth = 300\nposition = \"right\"\n[general]\nsort_by = \"size\"\n");
+        ConfigManager mgr(path);
+        QCOMPARE(mgr.sidebarWidth(), 300);
+        QCOMPARE(mgr.sortBy(), QString("size"));
+
+        write("[general]\n");
+        mgr.reload();
+        QCOMPARE(mgr.sidebarWidth(), 200);
+        QCOMPARE(mgr.sidebarPosition(), QString("left"));
+        QCOMPARE(mgr.sortBy(), QString("name"));
+    }
+
     void testOpenShortcutIsRemappable()
     {
         QTemporaryDir dir;

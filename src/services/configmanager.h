@@ -186,6 +186,7 @@ private:
     QString m_animCurveTransition;
     bool m_showWindowControls;
     bool m_showWindowControlsExplicit;  // true when user set it in config
+    bool m_showWindowControlsRuntimeDefault = false;
     QString m_windowButtonLayout;
     QVariantList m_customContextActions;
     QString m_configError;
