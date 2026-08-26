@@ -70,6 +70,20 @@ bool isTrashUriPath(const QString &path)
     return QUrl(path).scheme() == "trash";
 }
 
+// A name typed into New Folder / New File / Rename has to stay inside the
+// folder it was typed in: no separators, no "." or "..". The QML dialogs
+// validate too, but the filesystem boundary is here.
+QString entryNameError(const QString &name)
+{
+    if (name.isEmpty())
+        return QStringLiteral("Name cannot be empty");
+    if (name == QLatin1String(".") || name == QLatin1String(".."))
+        return QStringLiteral("'%1' is not a valid name").arg(name);
+    if (name.contains(QLatin1Char('/')) || name.contains(QChar(0)))
+        return QStringLiteral("Names cannot contain '/'");
+    return {};
+}
+
 // Every trash:// operation goes through gvfsd-trash. Without gvfs installed
 // GLib has no backend for the scheme at all and answers a bare "Operation not
 // supported" (issue #10) — say what is actually missing.
@@ -478,10 +492,13 @@ bool createEmptyFileSync(const QString &path, QString *error = nullptr)
     const QString normalized = normalizeLocation(path);
     if (!isUriPath(normalized)) {
         QFile file(normalized);
-        const bool ok = file.open(QIODevice::WriteOnly);
+        // NewOnly: O_EXCL semantics. WriteOnly would truncate a file another
+        // process created between the UI's existence check and this call.
+        const bool ok = file.open(QIODevice::NewOnly);
         file.close();
         if (!ok && error)
-            *error = QStringLiteral("Could not create file");
+            *error = file.exists() ? QStringLiteral("'%1' already exists").arg(locationFileName(normalized))
+                                   : QStringLiteral("Could not create file");
         return ok;
     }
 
@@ -1409,6 +1426,11 @@ QVariantMap FileOperations::renameResolvedItems(const QVariantList &operations)
         if (sourcePath.isEmpty() || targetPath.isEmpty())
             return renameResult(false, QStringLiteral("Rename operation is missing a path"));
 
+        if (const QString nameError = entryNameError(locationFileName(targetPath)); !nameError.isEmpty())
+            return renameResult(false, nameError);
+        if (parentLocation(targetPath) != parentLocation(sourcePath))
+            return renameResult(false, QStringLiteral("Rename cannot move an item to another folder"));
+
         if (sourcePaths.contains(sourcePath))
             return renameResult(false, QStringLiteral("Cannot rename the same item twice in one batch"));
 
@@ -1499,6 +1521,10 @@ QVariantMap FileOperations::renameResolvedItems(const QVariantList &operations)
 
 void FileOperations::createFolder(const QString &parentPath, const QString &name)
 {
+    if (const QString nameError = entryNameError(name); !nameError.isEmpty()) {
+        emit operationFinished(false, nameError);
+        return;
+    }
     const QString targetPath = joinLocation(parentPath, name);
     QString error;
     if (makeDirectorySync(targetPath, &error) || error.isEmpty()) {
@@ -1510,6 +1536,10 @@ void FileOperations::createFolder(const QString &parentPath, const QString &name
 
 void FileOperations::createFile(const QString &parentPath, const QString &name)
 {
+    if (const QString nameError = entryNameError(name); !nameError.isEmpty()) {
+        emit operationFinished(false, nameError);
+        return;
+    }
     const QString targetPath = joinLocation(parentPath, name);
     QString error;
     if (createEmptyFileSync(targetPath, &error) || error.isEmpty()) {

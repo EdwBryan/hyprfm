@@ -603,6 +603,48 @@ private slots:
 
     // --- Create folder ---
 
+    // Names are basenames: a "name" with separators or ".." must not escape
+    // the folder it was typed in.
+    void testNamesWithPathSegmentsAreRejected()
+    {
+        TestDir dir;
+        dir.createDir("inner");
+        dir.createFile("inner/file.txt", "x");
+        FileOperations ops;
+        QSignalSpy spy(&ops, &FileOperations::operationFinished);
+
+        ops.createFolder(dir.path() + "/inner", "../escaped");
+        ops.createFolder(dir.path() + "/inner", "a/b");
+        ops.createFile(dir.path() + "/inner", "../escaped.txt");
+        QCOMPARE(spy.count(), 3);
+        for (const auto &args : spy) QCOMPARE(args.at(0).toBool(), false);
+        QVERIFY(!dir.exists("escaped"));
+        QVERIFY(!dir.exists("inner/a"));
+        QVERIFY(!dir.exists("escaped.txt"));
+
+        QVERIFY(!ops.rename(dir.path() + "/inner/file.txt", "../moved.txt"));
+        QVERIFY(!ops.rename(dir.path() + "/inner/file.txt", "sub/file.txt"));
+        QVERIFY(!ops.rename(dir.path() + "/inner/file.txt", ".."));
+        QVERIFY(dir.exists("inner/file.txt"));
+        QVERIFY(!dir.exists("moved.txt"));
+    }
+
+    // New File must never truncate something that appeared after the
+    // dialog's existence check.
+    void testCreateFileKeepsExistingContent()
+    {
+        TestDir dir;
+        dir.createFile("taken.txt", "precious");
+        FileOperations ops;
+        QSignalSpy spy(&ops, &FileOperations::operationFinished);
+        ops.createFile(dir.path(), "taken.txt");
+        QCOMPARE(spy.count(), 1);
+        QCOMPARE(spy.constFirst().at(0).toBool(), false);
+        QFile f(dir.path() + "/taken.txt");
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        QCOMPARE(f.readAll(), QByteArray("precious"));
+    }
+
     void testCreateFolder()
     {
         TestDir dir;
