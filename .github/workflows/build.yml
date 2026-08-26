@@ -391,7 +391,13 @@ jobs:
       # instead of auto-generated from commit titles.
       - name: Release notes from the tag message
         if: startsWith(github.ref, 'refs/tags/v')
-        run: git tag -l --format='%(contents)' "${GITHUB_REF_NAME}" > release-notes.md
+        # actions/checkout leaves the tag peeled to its commit, so re-fetch
+        # the annotated tag object before reading its message.
+        run: |
+          git fetch --force --no-tags origin "refs/tags/${GITHUB_REF_NAME}:refs/tags/${GITHUB_REF_NAME}"
+          git tag -l --format='%(contents)' "${GITHUB_REF_NAME}" > release-notes.md
+          test -s release-notes.md
+          head -3 release-notes.md
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
