@@ -373,6 +373,11 @@ QQuickTextureFactory *ThumbnailResponse::textureFactory() const
     return QQuickTextureFactory::textureFactoryForImage(m_image);
 }
 
+QString ThumbnailResponse::errorString() const
+{
+    return m_image.isNull() ? QStringLiteral("No thumbnail for %1").arg(m_id) : QString();
+}
+
 // ---------------------------------------------------------------------------
 // ThumbnailProvider
 // ---------------------------------------------------------------------------

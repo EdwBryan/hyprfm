@@ -3,6 +3,7 @@
 #include <QFile>
 #include <QProcess>
 #include <QSignalSpy>
+#include <QTemporaryDir>
 #include <QImage>
 #include <QQuickTextureFactory>
 #include <QStandardPaths>
@@ -48,6 +49,19 @@ private:
     }
 
 private slots:
+    void testUnreadableImageReportsError()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.filePath("empty.png");
+        { QFile f(path); QVERIFY(f.open(QIODevice::WriteOnly)); }   // zero bytes
+
+        ThumbnailResponse response(path, QSize(64, 64));
+        QSignalSpy spy(&response, &QQuickImageResponse::finished);
+        QVERIFY(spy.wait(5000));
+        QVERIFY(response.textureFactory() == nullptr);
+        QVERIFY(!response.errorString().isEmpty());
+    }
+
     void testLoadValidImage()
     {
         TestDir dir;

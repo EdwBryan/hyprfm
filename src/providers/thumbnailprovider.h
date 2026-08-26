@@ -15,6 +15,10 @@ public:
 
     void run() override;
     QQuickTextureFactory *textureFactory() const override;
+    // A null image with no error reads as "loaded, nothing to draw" in QML
+    // and leaves a blank tile; report it so Image goes to Error and the
+    // delegate falls back to the icon.
+    QString errorString() const override;
 
 private:
     void generateImageThumbnail();

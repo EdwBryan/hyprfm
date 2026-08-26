@@ -573,7 +573,8 @@ GridView {
 
         Image {
             id: thumbImg
-            visible: delegateItem.hasThumbnail
+            // An empty or corrupt image has no thumbnail; show the icon instead.
+            visible: delegateItem.hasThumbnail && status !== Image.Error
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
             anchors.topMargin: 8
@@ -591,7 +592,7 @@ GridView {
 
         Image {
             id: iconImg
-            visible: !delegateItem.hasThumbnail
+            visible: !thumbImg.visible
             anchors.horizontalCenter: parent.horizontalCenter
             anchors.top: parent.top
             anchors.topMargin: 8
