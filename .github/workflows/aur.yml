@@ -1,7 +1,11 @@
 name: Update AUR
 
 on:
-  push:
+  # After a green Build of main, never on the push itself: a commit that
+  # fails to build or test must not reach the AUR.
+  workflow_run:
+    workflows: ["Build"]
+    types: [completed]
     branches:
       - main
   schedule:
@@ -14,6 +18,7 @@ concurrency:
 
 jobs:
   aur:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
 
     steps:

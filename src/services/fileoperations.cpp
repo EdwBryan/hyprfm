@@ -851,8 +851,12 @@ QStringList archiveEntriesFromOutput(const QString &program, const QString &outp
     QStringList entries;
 
     if (program == QStringLiteral("7z")) {
-        bool inEntries = false;
+        // "-slt" prints an archive-info block ("Path = <archive>") followed
+        // by a "----------" line and then the entries. "-ba" drops that
+        // header block, separator included, so only wait for the separator
+        // when there is one; otherwise every "Path =" line is an entry.
         const QStringList lines = output.split('\n');
+        bool inEntries = !lines.contains(QStringLiteral("----------"));
         for (const QString &line : lines) {
             const QString trimmed = line.trimmed();
             if (trimmed == QStringLiteral("----------")) {
