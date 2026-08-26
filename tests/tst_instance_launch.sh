@@ -92,12 +92,15 @@ spawn; second=$SPAWNED
 check "bare relaunch stays alive as a second window" "$(yesno "$second")" "yes"
 
 # --- 4. secondary windows never write the shared session -------------------
-stamp_before=$(stat -c %Y "$SESSION")
-spawn -n /etc; third=$SPAWNED
+# Checked by content, not mtime: the primary legitimately saves whenever its
+# geometry changes, and a tiling compositor resizes it when a third window
+# appears. What must never happen is the secondary's own tab landing in the
+# file, so give it a path the primary does not have.
+spawn -n /usr; third=$SPAWNED
 check "--new-window <path> opens its own window" "$(yesno "$third")" "yes"
 kill "$third"; sleep 1
-check "secondary window left session.json untouched" \
-      "$(stat -c %Y "$SESSION")" "$stamp_before"
+check "secondary window's tab is not in session.json" \
+      "$(grep -c '"/usr"' "$SESSION")" "0"
 
 # --- 5. stale socket from a crashed instance is recovered ------------------
 kill -9 "$primary" "$second" 2>/dev/null
