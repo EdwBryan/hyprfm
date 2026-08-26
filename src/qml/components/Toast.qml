@@ -64,7 +64,8 @@ Item {
 
                 Timer {
                     id: dismissTimer
-                    interval: 3000
+                    // Errors stay longer: a config parse error at startup is easy to miss in 3 s.
+                    interval: toastItem.toastType === "error" ? 8000 : 3000
                     running: true
                     onTriggered: fadeOut.start()
                 }
