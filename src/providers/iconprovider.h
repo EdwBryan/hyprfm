@@ -1,6 +1,7 @@
 #pragma once
 
 #include <QQuickImageProvider>
+#include <algorithm>
 #include <QSvgRenderer>
 #include <QPainter>
 #include <QDir>
@@ -61,9 +62,14 @@ public:
         int sz = (requestedSize.width() > 0) ? requestedSize.width() : 48;
         QSize iconSize(sz, sz);
 
-        // Parse optional color: "icon-name?color=#rrggbb"
+        // Parse optional params: "icon-name?theme=Name&color=#rrggbb".
+        // The theme comes from the URL, not only from setPrimaryTheme(): on a
+        // config reload QML re-requests icons before the configChanged slot
+        // that switches the provider runs, so trusting the current theme
+        // served the old theme's icons under the new URLs.
         QString iconName = id;
         QColor tintColor;
+        QString requestedTheme;
         int qmark = id.indexOf('?');
         if (qmark >= 0) {
             iconName = id.left(qmark);
@@ -71,8 +77,12 @@ public:
             for (const auto &param : params.split('&')) {
                 if (param.startsWith("color="))
                     tintColor = QColor(param.mid(6));
+                else if (param.startsWith("theme="))
+                    requestedTheme = param.mid(6);
             }
         }
+        if (!requestedTheme.isEmpty())
+            setPrimaryTheme(requestedTheme);
 
         bool isSymbolic = iconName.endsWith("-symbolic");
 
@@ -187,6 +197,27 @@ private:
         }
     }
 
+    // Size directories to try, best first: the exact size, then the closest
+    // larger one (a 64px Breeze folder downscaled looks right), then the
+    // largest smaller one. Trying "24" before "64" upscaled Breeze's
+    // simplified small icons into blurry outlines.
+    static QStringList sizeCandidates(int size)
+    {
+        QList<int> sizes = {16, 22, 24, 32, 48, 64, 96, 128, 256, 512};
+        if (!sizes.contains(size))
+            sizes.append(size);
+        std::sort(sizes.begin(), sizes.end(), [size](int a, int b) {
+            const bool aUp = a >= size, bUp = b >= size;
+            if (aUp != bUp)
+                return aUp;
+            return aUp ? a < b : a > b;
+        });
+        QStringList out;
+        for (int s : sizes)
+            out << QString::number(s);
+        return out;
+    }
+
     QString findIconIn(const QString &name, int size, const QStringList &themeDirs) const
     {
         static const QStringList categories = {
@@ -211,9 +242,7 @@ private:
             }
 
             // Pattern 3: category/size/name.ext (Breeze: actions/24/name.svg)
-            QStringList numSizes = {
-                QString::number(size), "24", "32", "48", "16", "22", "64", "96", "256"
-            };
+            const QStringList numSizes = sizeCandidates(size);
             for (const auto &cat : categories) {
                 for (const auto &sz : numSizes) {
                     for (const auto &ext : extensions) {
@@ -225,10 +254,9 @@ private:
             }
 
             // Pattern 4: sizexsize/category/name.ext (hicolor: 24x24/actions/name.svg)
-            QStringList sqSizes = {
-                QString::number(size) + "x" + QString::number(size),
-                "48x48", "32x32", "24x24", "16x16", "64x64", "96x96", "256x256"
-            };
+            QStringList sqSizes;
+            for (const auto &sz : numSizes)
+                sqSizes << sz + "x" + sz;
             for (const auto &sz : sqSizes) {
                 for (const auto &cat : categories) {
                     for (const auto &ext : extensions) {

@@ -1,4 +1,7 @@
 #include <QTest>
+#include <QTemporaryDir>
+#include <QDir>
+#include <QFileInfo>
 #include <QImage>
 #include <QSize>
 #include "providers/iconprovider.h"
@@ -17,6 +20,57 @@ private slots:
         // Should not crash with a nonexistent theme name
         IconProvider provider2("nonexistent-theme");
         Q_UNUSED(provider2);
+    }
+
+    // Breeze-style themes ship one file per size; the closest size at or
+    // above the request must win, not whichever directory is listed first.
+    void testPrefersClosestLargerSizeDirectory()
+    {
+        QTemporaryDir dir;
+        auto writeSvg = [&](const QString &rel, const QString &fill) {
+            QFileInfo fi(dir.filePath(rel));
+            QDir().mkpath(fi.absolutePath());
+            QFile f(fi.absoluteFilePath());
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write(QStringLiteral("<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'>"
+                                   "<rect width='10' height='10' fill='%1'/></svg>").arg(fill).toUtf8());
+        };
+        writeSvg("icons/t/places/24/folder.svg", "#0000ff");
+        writeSvg("icons/t/places/64/folder.svg", "#ff0000");
+        writeSvg("icons/t/places/256/folder.svg", "#00ff00");
+        qputenv("XDG_DATA_DIRS", dir.path().toUtf8());
+
+        IconProvider provider("t");
+        QSize size;
+        QImage big = provider.requestImage("folder", &size, QSize(96, 96));
+        QImage small = provider.requestImage("folder", &size, QSize(40, 40));
+        qunsetenv("XDG_DATA_DIRS");
+        QCOMPARE(big.pixelColor(48, 48), QColor("#00ff00"));    // 96 → 256, the smallest size at or above
+        QCOMPARE(small.pixelColor(20, 20), QColor("#ff0000"));  // 40 → 64, never the 24 below it
+    }
+
+    // The URL's ?theme= wins over whatever setPrimaryTheme() last set, so a
+    // live theme switch cannot serve stale icons under the new URLs.
+    void testThemeInUrlOverridesCurrentTheme()
+    {
+        QTemporaryDir dir;
+        auto writeSvg = [&](const QString &rel, const QString &fill) {
+            QFileInfo fi(dir.filePath(rel));
+            QDir().mkpath(fi.absolutePath());
+            QFile f(fi.absoluteFilePath());
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write(QStringLiteral("<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10'>"
+                                   "<rect width='10' height='10' fill='%1'/></svg>").arg(fill).toUtf8());
+        };
+        writeSvg("icons/one/places/64/folder.svg", "#ff0000");
+        writeSvg("icons/two/places/64/folder.svg", "#00ff00");
+        qputenv("XDG_DATA_DIRS", dir.path().toUtf8());
+
+        IconProvider provider("one");
+        QSize size;
+        QCOMPARE(provider.requestImage("folder?theme=one", &size, QSize(32, 32)).pixelColor(16, 16), QColor("#ff0000"));
+        QCOMPARE(provider.requestImage("folder?theme=two", &size, QSize(32, 32)).pixelColor(16, 16), QColor("#00ff00"));
+        qunsetenv("XDG_DATA_DIRS");
     }
 
     void testMissingIconReturnsImage()
