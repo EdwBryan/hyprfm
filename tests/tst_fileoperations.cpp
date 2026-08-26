@@ -155,6 +155,30 @@ private slots:
         QVERIFY2(spy.isEmpty(), "launch reported a failure");
     }
 
+    void testOpenInEditorRunsEditorInTerminal()
+    {
+        QTemporaryDir dir;
+        const QString marker = dir.filePath("argv");
+        const QString term = dir.filePath("term.sh");
+        {
+            QFile f(term);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write(QStringLiteral("#!/bin/sh\nprintf '%s ' \"$@\" > \"%1\"\n").arg(marker).toUtf8());
+        }
+        QFile::setPermissions(term, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+        qputenv("TERMINAL", term.toUtf8());
+        qputenv("VISUAL", "");
+        qputenv("EDITOR", "myeditor --wait");
+
+        FileOperations ops;
+        ops.openInEditor("/tmp/config.toml");
+        QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(marker), 5000);
+        QFile f(marker);
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        QCOMPARE(QString::fromUtf8(f.readAll()).trimmed(), QString("-e myeditor --wait /tmp/config.toml"));
+        qunsetenv("TERMINAL"); qunsetenv("EDITOR");
+    }
+
     void testRunCustomActionSubstitutesPathAndRunsPerItem()
     {
         QTemporaryDir dir;

@@ -2975,7 +2975,7 @@ ApplicationWindow {
                     transparencyLevel: config.transparencyLevel
                 })
             }
-            fileOps.openFile(config.configPath)
+            fileOps.openInEditor(config.configPath)
         }
     }
 

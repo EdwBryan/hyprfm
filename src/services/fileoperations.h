@@ -59,6 +59,7 @@ public:
     Q_INVOKABLE void createFolder(const QString &parentPath, const QString &name);
     Q_INVOKABLE void createFile(const QString &parentPath, const QString &name);
     Q_INVOKABLE void openFile(const QString &path);
+    Q_INVOKABLE void openInEditor(const QString &path);
     Q_INVOKABLE bool pathExists(const QString &path) const;
     Q_INVOKABLE bool isRemotePath(const QString &path) const;
     Q_INVOKABLE QString parentPath(const QString &path) const;

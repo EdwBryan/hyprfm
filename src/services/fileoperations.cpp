@@ -1767,6 +1767,30 @@ void FileOperations::openFileWith(const QString &path, const QString &desktopFil
     proc->start(program, args);
 }
 
+// Edit config.toml (Ctrl+Shift+,). xdg-open was the wrong tool for it: most
+// systems have no application registered for TOML, so nothing opened and
+// nothing said so. Run $VISUAL/$EDITOR in $TERMINAL and fall back to the
+// default application only when no editor is configured.
+void FileOperations::openInEditor(const QString &path)
+{
+    QString editor = qEnvironmentVariable("VISUAL");
+    if (editor.isEmpty())
+        editor = qEnvironmentVariable("EDITOR");
+    if (editor.isEmpty()) {
+        openFile(path);
+        return;
+    }
+
+    const QString terminal = qEnvironmentVariable("TERMINAL", QStringLiteral("kitty"));
+    QStringList args{QStringLiteral("-e")};
+    args += QProcess::splitCommand(editor);
+    args << path;
+    if (!QProcess::startDetached(terminal, args)) {
+        emit operationFinished(false,
+            QStringLiteral("Could not run '%1' — set $TERMINAL to your terminal emulator").arg(terminal));
+    }
+}
+
 bool FileOperations::hasClipboardImage() const
 {
     const QClipboard *clipboard = QGuiApplication::clipboard();
