@@ -249,7 +249,6 @@ void ConfigManager::setDefaults()
         ? QStringLiteral("catppuccin-mocha")
         : m_defaultThemeName.trimmed();
     m_iconTheme = "Adwaita";
-    m_builtinIcons = true;
     m_fontFamily.clear();
     m_defaultView = "grid";
     m_showHidden = false;
@@ -316,8 +315,6 @@ void ConfigManager::loadConfig()
             m_theme = QString::fromStdString(*v);
         if (auto v = config["general"]["icon_theme"].value<std::string>())
             m_iconTheme = QString::fromStdString(*v);
-        if (auto v = config["general"]["builtin_icons"].value<bool>())
-            m_builtinIcons = *v;
         if (auto v = config["general"]["font_family"].value<std::string>())
             m_fontFamily = QString::fromStdString(*v);
         if (auto v = config["general"]["default_view"].value<std::string>())
@@ -545,11 +542,9 @@ QString ConfigManager::documentedConfigTemplate()
 # light/dark preference (catppuccin-latte / catppuccin-mocha).
 # theme = "catppuccin-mocha"
 
-# System icon theme used when a bundled icon is missing.
+# Icon theme for file and folder icons (a directory name under
+# /usr/share/icons or ~/.icons). Toolbar and sidebar icons are built in.
 icon_theme = "Adwaita"
-
-# Prefer HyprFM's bundled SVG icons over the system icon theme.
-builtin_icons = true
 
 # UI font family. Empty = the desktop's UI font.
 font_family = ""
@@ -795,7 +790,6 @@ void ConfigManager::saveListColumns(const QStringList &columns, const QVariantMa
 
 QString ConfigManager::theme() const { return m_theme; }
 QString ConfigManager::iconTheme() const { return m_iconTheme; }
-bool ConfigManager::builtinIcons() const { return m_builtinIcons; }
 QString ConfigManager::fontFamily() const { return m_fontFamily; }
 QString ConfigManager::defaultView() const { return m_defaultView; }
 bool ConfigManager::showHidden() const { return m_showHidden; }
@@ -914,11 +908,6 @@ void ConfigManager::saveSettings(const QVariantMap &settings)
             m_iconTheme = iconTheme;
             general.insert_or_assign("icon_theme", iconTheme.toStdString());
         }
-    }
-
-    if (settings.contains("builtinIcons")) {
-        m_builtinIcons = settings.value("builtinIcons").toBool();
-        general.insert_or_assign("builtin_icons", m_builtinIcons);
     }
 
     if (settings.contains("fontFamily")) {

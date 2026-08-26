@@ -153,7 +153,6 @@ private slots:
 
         QCOMPARE(fromTemplate.theme(), defaults.theme());
         QCOMPARE(fromTemplate.iconTheme(), defaults.iconTheme());
-        QCOMPARE(fromTemplate.builtinIcons(), defaults.builtinIcons());
         QCOMPARE(fromTemplate.fontFamily(), defaults.fontFamily());
         QCOMPARE(fromTemplate.defaultView(), defaults.defaultView());
         QCOMPARE(fromTemplate.showHidden(), defaults.showHidden());
@@ -223,7 +222,6 @@ private slots:
 
         QCOMPARE(mgr.theme(), QString("catppuccin-mocha"));
         QCOMPARE(mgr.iconTheme(), QString("Adwaita"));
-        QCOMPARE(mgr.builtinIcons(), true);
         QCOMPARE(mgr.fontFamily(), QString());
         QCOMPARE(mgr.defaultView(), QString("grid"));
         QCOMPARE(mgr.showHidden(), false);
@@ -664,12 +662,11 @@ private slots:
         f.open(QIODevice::WriteOnly);
         f.write("[general]\n"
                 "icon_theme = \"Papirus\"\n"
-                "builtin_icons = false\n");
+                "");
         f.close();
 
         ConfigManager mgr(path);
         QCOMPARE(mgr.iconTheme(), QString("Papirus"));
-        QCOMPARE(mgr.builtinIcons(), false);
     }
 
     // --- Bookmarks ---

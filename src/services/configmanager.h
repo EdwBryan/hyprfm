@@ -17,7 +17,6 @@ class ConfigManager : public QObject
     Q_PROPERTY(QStringList availableThemes READ availableThemes CONSTANT)
     Q_PROPERTY(QString theme READ theme NOTIFY configChanged)
     Q_PROPERTY(QString iconTheme READ iconTheme NOTIFY configChanged)
-    Q_PROPERTY(bool builtinIcons READ builtinIcons NOTIFY configChanged)
     Q_PROPERTY(QString fontFamily READ fontFamily NOTIFY configChanged)
     Q_PROPERTY(QString defaultView READ defaultView NOTIFY configChanged)
     Q_PROPERTY(bool showHidden READ showHidden NOTIFY configChanged)
@@ -66,7 +65,6 @@ public:
     QString configPath() const;
     QString theme() const;
     QString iconTheme() const;
-    bool builtinIcons() const;
     QString fontFamily() const;
     QString defaultView() const;
     bool showHidden() const;
@@ -154,7 +152,6 @@ private:
 
     QString m_theme;
     QString m_iconTheme;
-    bool m_builtinIcons;
     QString m_fontFamily;
     QString m_defaultView;
     bool m_showHidden;

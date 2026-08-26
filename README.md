@@ -262,7 +262,6 @@ Config lives at `~/.config/hyprfm/config.toml`. On first run HyprFM writes it fu
 [general]
 # theme = "catppuccin-mocha"   # filename in themes/ without .toml; unset = follow system light/dark
 icon_theme = "Adwaita"         # system icon theme fallback
-builtin_icons = true           # use bundled SVG icons
 font_family = ""               # UI font; empty = desktop font
 default_view = "grid"          # grid | detailed | miller
 show_hidden = false
