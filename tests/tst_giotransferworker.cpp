@@ -1,5 +1,6 @@
 #include <QTest>
 #include <QSignalSpy>
+#include <unistd.h>
 #include <QThread>
 #include <QTimer>
 #include "testdir.h"
@@ -68,6 +69,68 @@ private slots:
         QCOMPARE(QFileInfo(dst.path() + "/dir/sub/c.txt").size(), 3000);
         // finished() and the queued thread.quit() race inside spy.wait(): quit
         // explicitly or wait() can block on a loop that never got the call.
+        thread.quit();
+        QVERIFY(thread.wait(5000));
+    }
+
+    // Overwrite with a backup that cannot be created must not touch the
+    // target: the undo entry would point at a backup that does not exist.
+    void testOverwriteAbortsWhenBackupFails()
+    {
+        TestDir src, dst;
+        src.createFile("new.txt", "new");
+        dst.createFile("target.txt", "keep me");
+        dst.createFile("notadir", "x");   // backup parent is a file → mkdir and move fail
+
+        GioTransferWorker worker;
+        QList<GioTransferWorker::TransferItem> items;
+        items.append({src.path() + "/new.txt", dst.path() + "/target.txt",
+                      dst.path() + "/notadir/backup.txt", true});
+        QSignalSpy finishSpy(&worker, &GioTransferWorker::finished);
+        QThread thread;
+        worker.moveToThread(&thread);
+        connect(&thread, &QThread::started, &worker, [&]() { worker.execute(items, false); });
+        connect(&worker, &GioTransferWorker::finished, &thread, &QThread::quit);
+        thread.start();
+        QVERIFY(finishSpy.wait(10000));
+        QCOMPARE(finishSpy.constFirst().at(0).toBool(), false);
+        QVERIFY(!finishSpy.constFirst().at(1).toString().isEmpty());
+        QFile f(dst.path() + "/target.txt");
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        QCOMPARE(f.readAll(), QByteArray("keep me"));
+        thread.quit();
+        QVERIFY(thread.wait(5000));
+    }
+
+    // A tree that cannot be fully read is not a finished copy, so a move
+    // must leave the source alone.
+    void testMoveKeepsSourceWhenTreeCannotBeRead()
+    {
+        if (geteuid() == 0)
+            QSKIP("root ignores directory permissions");
+        TestDir src, dst;
+        src.createDir("tree");
+        src.createFile("tree/a.txt", "a");
+        src.createDir("tree/locked");
+        src.createFile("tree/locked/b.txt", "b");
+        const QString locked = src.path() + "/tree/locked";
+        QVERIFY(QFile::setPermissions(locked, QFileDevice::Permissions()));
+
+        GioTransferWorker worker;
+        QList<GioTransferWorker::TransferItem> items;
+        items.append({src.path() + "/tree", dst.path() + "/tree", {}, false});
+        QSignalSpy finishSpy(&worker, &GioTransferWorker::finished);
+        QThread thread;
+        worker.moveToThread(&thread);
+        connect(&thread, &QThread::started, &worker, [&]() { worker.execute(items, true); });
+        connect(&worker, &GioTransferWorker::finished, &thread, &QThread::quit);
+        thread.start();
+        const bool finished = finishSpy.wait(10000);
+        QFile::setPermissions(locked, QFileDevice::ReadOwner | QFileDevice::WriteOwner | QFileDevice::ExeOwner);
+        QVERIFY(finished);
+        QCOMPARE(finishSpy.constFirst().at(0).toBool(), false);
+        QVERIFY(QFile::exists(src.path() + "/tree/a.txt"));
+        QVERIFY(QFile::exists(src.path() + "/tree/locked/b.txt"));
         thread.quit();
         QVERIFY(thread.wait(5000));
     }

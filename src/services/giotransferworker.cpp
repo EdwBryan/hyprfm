@@ -202,10 +202,17 @@ void GioTransferWorker::execute(const QList<TransferItem> &items, bool moveOpera
             }
             GError *mvErr = nullptr;
             g_file_move(existingTarget, backupFile, G_FILE_COPY_NONE, nullptr, nullptr, nullptr, &mvErr);
-            if (mvErr)
-                g_error_free(mvErr);
             g_object_unref(existingTarget);
             g_object_unref(backupFile);
+            if (mvErr) {
+                // Never overwrite a file we failed to preserve: the undo entry
+                // would point at a backup that does not exist.
+                success = false;
+                errorMsg = tr("Could not back up %1 before overwriting: %2")
+                    .arg(item.targetPath, gErrorToUserMessage(mvErr));
+                g_error_free(mvErr);
+                break;
+            }
         }
 
         // Query source file type
@@ -523,10 +530,16 @@ bool GioTransferWorker::copyRecursive(GFile *source, GFile *destination, GFileCo
     }
 
     GFileInfo *childInfo;
-    while ((childInfo = g_file_enumerator_next_file(enumerator, m_cancellable, nullptr)) != nullptr) {
+    GError *nextErr = nullptr;
+    while ((childInfo = g_file_enumerator_next_file(enumerator, m_cancellable, &nextErr)) != nullptr) {
         if (m_cancelled.load()) {
+            // A cancelled copy is not a finished copy; a move must not go
+            // on to delete the source. Empty error = cancelled, as above.
             g_object_unref(childInfo);
-            break;
+            g_file_enumerator_close(enumerator, nullptr, nullptr);
+            g_object_unref(enumerator);
+            error->clear();
+            return false;
         }
 
         const char *name = g_file_info_get_name(childInfo);
@@ -593,6 +606,15 @@ bool GioTransferWorker::copyRecursive(GFile *source, GFile *destination, GFileCo
     g_file_enumerator_close(enumerator, nullptr, nullptr);
     g_object_unref(enumerator);
 
+    // next_file() returns null both at the end of the directory and on a
+    // read failure; only the error tells them apart. A partial tree must not
+    // count as copied, or a move would delete the source.
+    if (nextErr) {
+        *error = gErrorToUserMessage(nextErr);
+        g_error_free(nextErr);
+        return false;
+    }
+
     // Copy directory metadata (permissions, timestamps) from source to destination
     GError *attrErr = nullptr;
     GFileInfo *srcInfo = g_file_query_info(source,
@@ -645,7 +667,8 @@ bool GioTransferWorker::deleteRecursive(GFile *file, QString *error)
 
     // Delete children recursively
     GFileInfo *childInfo;
-    while ((childInfo = g_file_enumerator_next_file(enumerator, m_cancellable, nullptr)) != nullptr) {
+    GError *nextErr = nullptr;
+    while ((childInfo = g_file_enumerator_next_file(enumerator, m_cancellable, &nextErr)) != nullptr) {
         const char *name = g_file_info_get_name(childInfo);
         GFile *child = g_file_get_child(file, name);
         g_object_unref(childInfo);
@@ -661,6 +684,11 @@ bool GioTransferWorker::deleteRecursive(GFile *file, QString *error)
 
     g_file_enumerator_close(enumerator, nullptr, nullptr);
     g_object_unref(enumerator);
+    if (nextErr) {
+        *error = gErrorToUserMessage(nextErr);
+        g_error_free(nextErr);
+        return false;
+    }
 
     // Delete the directory itself
     GError *delErr = nullptr;
