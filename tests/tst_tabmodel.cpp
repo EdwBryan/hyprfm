@@ -335,6 +335,38 @@ private slots:
         QCOMPARE(model.activeTab()->viewMode(), QString("detailed"));
     }
 
+    void testTabListModelRestoreSessionHealsRetiredViewMode()
+    {
+        // The actual failure this guards: a session written before the list
+        // view was replaced still says "list". Restored verbatim it matched
+        // none of FileViewContainer's three cases, so every view hid itself
+        // and the pane came up blank with the files loaded behind it.
+        TabListModel model;
+        QJsonArray tabs;
+        tabs.append(QJsonObject{{"path", QDir::homePath()}, {"viewMode", "list"}});
+        model.restoreSession(tabs, 0);
+        QCOMPARE(model.activeTab()->viewMode(), QString("detailed"));
+    }
+
+    void testTabListModelRestoreSessionRejectsUnknownViewMode()
+    {
+        TabListModel model;
+        QJsonArray tabs;
+        tabs.append(QJsonObject{{"path", QDir::homePath()}, {"viewMode", "detaild"}});
+        model.restoreSession(tabs, 0);
+        QCOMPARE(model.activeTab()->viewMode(), QString("grid"));
+    }
+
+    void testNormalizeViewModeKeepsValidModes()
+    {
+        for (const QString &mode : {QStringLiteral("grid"), QStringLiteral("detailed"),
+                                    QStringLiteral("miller")})
+            QCOMPARE(TabModel::normalizeViewMode(mode), mode);
+        QCOMPARE(TabModel::normalizeViewMode("list"), QString("detailed"));
+        QCOMPARE(TabModel::normalizeViewMode(""), QString("grid"));
+        QCOMPARE(TabModel::normalizeViewMode("banana"), QString("grid"));
+    }
+
     void testTabListModelActiveIndex()
     {
         TabListModel model;

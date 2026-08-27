@@ -1,4 +1,5 @@
 #include "models/tabmodel.h"
+#include <QDebug>
 #include <QFileInfo>
 #include <QUrl>
 
@@ -100,13 +101,25 @@ bool TabModel::secondaryCanGoForward() const { return !m_secondaryForwardStack.i
 QString TabModel::sortBy() const { return m_sortBy; }
 bool TabModel::sortAscending() const { return m_sortAscending; }
 
+// "list" was the third view until it was replaced by the Miller view. Sessions
+// and configs written before that still carry it, and an unrecognised mode
+// leaves FileViewContainer with nothing to show, so map it onto the closest
+// survivor and fall back to the default for anything else.
+QString TabModel::normalizeViewMode(const QString &mode)
+{
+    if (mode == QStringLiteral("grid") || mode == QStringLiteral("detailed")
+        || mode == QStringLiteral("miller"))
+        return mode;
+    if (mode == QStringLiteral("list"))
+        return QStringLiteral("detailed");
+    if (!mode.isEmpty())
+        qWarning() << "Unknown view mode" << mode << "- falling back to grid";
+    return QStringLiteral("grid");
+}
+
 void TabModel::setViewMode(const QString &mode)
 {
-    QString normalized = mode;
-    if (normalized == QStringLiteral("list"))
-        normalized = QStringLiteral("detailed");
-    else if (normalized != QStringLiteral("grid") && normalized != QStringLiteral("detailed") && normalized != QStringLiteral("miller"))
-        normalized = QStringLiteral("grid");
+    const QString normalized = normalizeViewMode(mode);
 
     if (m_viewMode != normalized) {
         m_viewMode = normalized;

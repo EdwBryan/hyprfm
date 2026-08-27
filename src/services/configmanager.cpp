@@ -336,12 +336,8 @@ void ConfigManager::loadConfig()
             m_iconTheme = QString::fromStdString(*v);
         if (auto v = config["general"]["font_family"].value<std::string>())
             m_fontFamily = QString::fromStdString(*v);
-        if (auto v = config["general"]["default_view"].value<std::string>()) {
-            QString dv = QString::fromStdString(*v);
-            if (dv == QStringLiteral("list"))
-                dv = QStringLiteral("detailed");
-            m_defaultView = dv;
-        }
+        if (auto v = config["general"]["default_view"].value<std::string>())
+            m_defaultView = QString::fromStdString(*v);
         if (auto v = config["general"]["show_hidden"].value<bool>())
             m_showHidden = *v;
         if (auto v = config["general"]["dependency_startup_check"].value<bool>())

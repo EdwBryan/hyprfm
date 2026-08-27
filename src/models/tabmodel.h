@@ -36,6 +36,8 @@ public:
     bool sortAscending() const;
 
     void setViewMode(const QString &mode);
+    // Maps retired and unrecognised view modes onto a mode the UI can render.
+    static QString normalizeViewMode(const QString &mode);
     void setSplitViewEnabled(bool enabled);
     void setSecondaryCurrentPath(const QString &path);
     void setSortBy(const QString &column);
