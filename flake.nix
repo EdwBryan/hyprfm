@@ -30,6 +30,10 @@
       quill,
     }:
     let
+      # aarch64 evaluates cleanly -- every dependency resolves for it, which
+      # rules out the usual "not available on this platform" failure -- but it
+      # has never actually been compiled or run on aarch64 hardware. Treat it
+      # as offered, not verified.
       systems = [
         "x86_64-linux"
         "aarch64-linux"

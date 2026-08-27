@@ -6,6 +6,15 @@ on:
       - main
     tags:
       - 'v*'
+  # Build and test pull requests too. Everything that publishes -- AppImage,
+  # Flatpak, the release job -- is gated on refs/tags/v, so a PR run only
+  # configures, builds and runs the test suite. Without this a PR could add a
+  # runtime dependency the package never ships and no amount of review would
+  # catch it; that is exactly how the nix flake shipped with archive handling
+  # and icons broken.
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
