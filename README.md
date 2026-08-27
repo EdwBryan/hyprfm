@@ -35,6 +35,12 @@ HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
 
 ## 🧭 Contents
 
+<!-- Anchors are taken verbatim from GitHub's render. Note that ⌨️ and ⚙️
+     carry a U+FE0F variation selector which GitHub keeps in the slug, so
+     those two links begin with an invisible character. Re-derive them with
+     `gh api repos/OWNER/REPO/readme -H 'Accept: application/vnd.github.html'`
+     if you rename a heading. -->
+
 - [✨ Features](#-features)
   - [Views](#views)
   - [Navigation & input](#navigation--input)
@@ -47,12 +53,12 @@ HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
   - [AppImage (any distro)](#appimage-any-distro)
   - [Nix (flake)](#nix-flake)
   - [Build from source](#build-from-source)
-- [⌨️ Keyboard shortcuts](#-keyboard-shortcuts)
+- [⌨️ Keyboard shortcuts](#️-keyboard-shortcuts)
   - [Navigation](#navigation)
   - [Views](#views-1)
   - [Tabs & windows](#tabs--windows)
   - [File operations](#file-operations-1)
-- [⚙️ Configuration](#-configuration)
+- [⚙️ Configuration](#️-configuration)
 - [🎨 Theming](#-theming)
 - [🧱 Architecture](#-architecture)
 - [🤝 Contributing](#-contributing)
