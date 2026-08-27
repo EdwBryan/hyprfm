@@ -15,7 +15,7 @@
 
 ---
 
-HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweight, themeable, and built around fast keyboard navigation. It pairs a polished UI with the practical features power users expect — Miller column view, kinetic scrolling, drag & drop, async operations, rich previews, and a TOML-based theme system.
+HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweight, themeable, and built around fast keyboard navigation. It pairs a polished UI with the practical features power users expect, including Miller column view, kinetic scrolling, drag & drop, async operations, rich previews, and a TOML-based theme system.
 
 <div align="center">
 
@@ -33,16 +33,43 @@ HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
 
 ---
 
+## 🧭 Contents
+
+- [✨ Features](#-features)
+  - [Views](#views)
+  - [Navigation & input](#navigation--input)
+  - [File operations](#file-operations)
+  - [Look & feel](#look--feel)
+  - [Integrations](#integrations)
+- [📦 Installation](#-installation)
+  - [Arch Linux (AUR)](#arch-linux-aur)
+  - [Flatpak (self-hosted)](#flatpak-self-hosted)
+  - [AppImage (any distro)](#appimage-any-distro)
+  - [Nix (flake)](#nix-flake)
+  - [Build from source](#build-from-source)
+- [⌨️ Keyboard shortcuts](#-keyboard-shortcuts)
+  - [Navigation](#navigation)
+  - [Views](#views-1)
+  - [Tabs & windows](#tabs--windows)
+  - [File operations](#file-operations-1)
+- [⚙️ Configuration](#-configuration)
+- [🎨 Theming](#-theming)
+- [🧱 Architecture](#-architecture)
+- [🤝 Contributing](#-contributing)
+- [📜 License](#-license)
+
+---
+
 ## ✨ Features
 
 ### Views
 
 - **Grid view** with adjustable column count (`Ctrl+Scroll` to zoom)
 - **Detailed view** with sortable columns, image/video thumbnails, and folder item counts
-- **Miller columns** (`Ctrl+2`) — parent · current · live preview, the macOS Finder favorite
+- **Miller columns** (`Ctrl+2`): parent · current · live preview, the macOS Finder favorite
 - **Image and video thumbnails** in detailed and Miller views
-- **Quick preview** (`Space`) — full-screen overlay for images, video (poster frame), PDFs, text, with metadata sidebar
-- **Split pane** (`F3`) — work in two directories side by side
+- **Quick preview** (`Space`): full-screen overlay for images, video (poster frame), PDFs, text, with metadata sidebar
+- **Split pane** (`F3`): work in two directories side by side
 
 <div align="center">
 
@@ -53,7 +80,7 @@ HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
 
 ### Navigation & input
 
-- **Full keyboard navigation** — arrows, vim-friendly shortcuts, type-ahead search
+- **Full keyboard navigation**: arrows, vim-friendly shortcuts, type-ahead search
 - **Tabs** with independent history per pane
 - **Path bar** with breadcrumbs and inline editing (`Ctrl+L`)
 - **Bookmarks sidebar** with drag-to-reorder, inline rename, and udisks2 device mounting
@@ -65,7 +92,7 @@ HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
 - **Async copy / move** via GIO with live progress, speed, ETA, and pause
 - **Drag & drop** between panes, tabs, and external apps (Wayland-native)
 - **Trash** with restore (XDG-compliant)
-- **Bulk rename** — find/replace (plain or regex), prefix/suffix, numbered sequences
+- **Bulk rename**: find/replace (plain or regex), prefix/suffix, numbered sequences
 - **Compress / extract** archives
 - **Open With** dialog populated from `.desktop` entries
 - **Undo/redo** for file operations
@@ -80,7 +107,7 @@ HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
 ### Integrations
 
 - **udisks2** mount/unmount of removable drives
-- **gvfs / gio** for SFTP, SMB and MTP (the trash is read directly, no gvfs needed)
+- **gvfs / gio** for SFTP, SMB and MTP (the trash is read directly and does not need it)
 - **Git status overlays** in file lists (modified, staged, untracked, …)
 - **wl-clipboard** for system clipboard
 - **bat** for syntax-highlighted text previews
@@ -90,7 +117,7 @@ HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
 <div align="center">
 
 ![Quick preview](docs/screenshots/quick-preview.png)
-*Quick preview overlay (Space) — image preview with full metadata sidebar*
+*Quick preview overlay (Space): image preview with full metadata sidebar*
 
 </div>
 
@@ -108,7 +135,7 @@ The PKGBUILD pulls latest `main`, builds with Ninja + parallel jobs + tests disa
 
 ### Flatpak (self-hosted)
 
-HyprFM publishes a signed Flatpak repository at `hyprfm.soyebjim.me`. Because HyprFM depends on the KDE Platform runtime from Flathub, the Flathub remote must exist at the **same scope** you install into — for `--user` installs, that means a `--user` Flathub remote. Add both remotes once and install:
+HyprFM publishes a signed Flatpak repository at `hyprfm.soyebjim.me`. Because HyprFM depends on the KDE Platform runtime from Flathub, the Flathub remote must exist at the **same scope** you install into. For `--user` installs, that means a `--user` Flathub remote. Add both remotes once and install:
 
 ```bash
 # Flathub at user scope (provides org.kde.Platform)
@@ -139,7 +166,7 @@ chmod +x HyprFM-*.AppImage
 The asset name carries the version, so grab the current one from the
 [releases page](https://github.com/soyeb-jim285/hyprfm/releases/latest) if you would rather not pipe through `curl`.
 
-The AppImage is fully self-contained — no system Qt installation required.
+The AppImage is fully self-contained. You do not need a system Qt installation.
 
 ### Nix (flake)
 
@@ -157,19 +184,21 @@ Or pull it into a system/home-manager flake:
 
 then reference `hyprfm.packages.<system>.default` in `environment.systemPackages` / `home.packages`. The package version is parsed straight from `CMakeLists.txt`, so it always tracks the tree it's built from.
 
-The package carries its own tools — archive handling, previews, search, the
-gvfs client module — so it works out of the box. The one thing it cannot ship
-is the **gvfs daemon**: `gvfsd` and its backends are D-Bus–activated,
-per-session services, so they have to come from the session rather than from an
+The package bundles the tools HyprFM shells out to, including archive handling,
+previews, search and the gvfs client module, so nothing else has to be
+installed alongside it.
+
+It cannot bundle the gvfs daemon. `gvfsd` and its backends are D-Bus-activated
+per-session services, so they come from the session rather than from an
 application's closure. On NixOS:
 
 ```nix
 services.gvfs.enable = true;
 ```
 
-Without it the Trash still works — HyprFM reads the trash directories directly
-— but the Network sidebar (`sftp://`, `smb://`, `mtp://`) has nothing to talk
-to. On a non-NixOS host with `nix run`, the distro's own gvfs covers this.
+Without it the Trash still works, because HyprFM reads the trash directories
+directly, but the Network sidebar (`sftp://`, `smb://`, `mtp://`) has nothing to
+connect to. On a non-NixOS host the distro's own gvfs covers this.
 
 ### Build from source
 
@@ -183,11 +212,11 @@ cmake --build build --parallel
 ./build/src/hyprfm
 ```
 
-> **Note:** the `--recursive` flag is important — HyprFM uses Git submodules for the [Quill](https://github.com/soyeb-jim285/quill) component library and the [quill-icons](https://github.com/soyeb-jim285/quill-icons) icon set.
+> **Note:** the `--recursive` flag is important: HyprFM uses Git submodules for the [Quill](https://github.com/soyeb-jim285/quill) component library and the [quill-icons](https://github.com/soyeb-jim285/quill-icons) icon set.
 
 #### AppImage from source
 
-To build a self-contained AppImage from the current checkout — useful for testing a fix that is on `main` but not yet released:
+To build a self-contained AppImage from the current checkout, useful for testing a fix that is on `main` but not yet released:
 
 ```bash
 ./scripts/build-appimage-local.sh
@@ -201,8 +230,8 @@ The result lands in the repo root as `HyprFM-<version>-x86_64.AppImage`. The scr
 |---|---|
 | **Required (build)** | `cmake`, `ninja`, `qt6-base`, `qt6-declarative`, `qt6-svg` |
 | **Required (runtime)** | `qt6-base`, `qt6-declarative`, `qt6-svg`, `qt6-wayland`, `glib2`, `xdg-utils` |
-| **Archives** | `tar`, `gzip`, `bzip2`, `xz`, `zstd`, `zip`, `unzip`, `p7zip` (`7z`), `libarchive` (`bsdtar`) — compress/extract shells out to these by name, so a missing one fails only that format |
-| **Optional** | `kwindowsystem` / `KF6WindowSystem` (native KDE blur), `wl-clipboard` (clipboard), `fd` (fast search), `bat` (syntax highlighting), `git` (git status overlays), `gvfs` (SFTP/SMB/MTP — no longer needed for the trash), `gvfs-smb` (SMB), `gvfs-mtp` (Android/MTP phones), `ffmpeg` (video thumbnails), `exiftool` (metadata sidebar), `udisks2` (device mounting), `poppler` / `poppler-utils` (PDF previews via `pdftoppm`) |
+| **Archives** | `tar`, `gzip`, `bzip2`, `xz`, `zstd`, `zip`, `unzip`, `p7zip` (`7z`), `libarchive` (`bsdtar`). Compress and extract call these by name, so a missing one only breaks that format. |
+| **Optional** | `kwindowsystem` / `KF6WindowSystem` (native KDE blur), `wl-clipboard` (clipboard), `fd` (fast search), `bat` (syntax highlighting), `git` (git status overlays), `gvfs` (SFTP/SMB/MTP; not needed for the trash), `gvfs-smb` (SMB), `gvfs-mtp` (Android/MTP phones), `ffmpeg` (video thumbnails), `exiftool` (metadata sidebar), `udisks2` (device mounting), `poppler` / `poppler-utils` (PDF previews via `pdftoppm`) |
 
 ---
 
@@ -256,7 +285,7 @@ The result lands in the repo root as `HyprFM-<version>-x86_64.AppImage`. The scr
 | `Ctrl+Alt+N` | New window |
 
 Launching `hyprfm` while it is already running opens another independent
-window. The one exception is `hyprfm <path>` — that forwards the path to the
+window. The one exception is `hyprfm <path>`, which forwards the path to the
 running window as a new tab, so desktop launchers and `xdg-open` keep behaving
 as expected. Pass `--new-window` (or `-n`) to get a separate window for a path
 too.
@@ -362,7 +391,7 @@ types = ["png"]                     # "*", "dir", extension, or MIME ("image/*")
 
 ## 🎨 Theming
 
-Themes are plain TOML files — nothing is hardcoded in the binary. The bundled
+Themes are plain TOML files. Nothing is hardcoded in the binary. The bundled
 Catppuccin themes ship as `/usr/share/hyprfm/themes/*.toml`; copy one as a
 starting point:
 
@@ -379,7 +408,7 @@ directory appears in the theme picker. Select it there, or set it in config:
 theme = "mytheme"
 ```
 
-A theme is just a colour table — any key you omit falls back to the default:
+A theme is just a colour table, and any key you omit falls back to the default:
 
 ```toml
 [colors]
@@ -408,9 +437,9 @@ Themes reload live on save.
 
 HyprFM is a three-layer Qt6 application:
 
-- **QML frontend** (`src/qml/`) — all rendering. `Main.qml` wires tab state, selection, and shortcuts. Views (`FileGridView`, `FileDetailedView`, `FileMillerView`) are switched by `FileViewContainer`. The [Quill](https://github.com/soyeb-jim285/quill) component library provides themed Buttons, TextFields, Cards, etc.
-- **C++ backend** (`src/models/`, `src/services/`, `src/providers/`) — `QAbstractListModel` subclasses for files, tabs, bookmarks, devices. Async services for clipboard, file operations, search, disk usage, previews. Exposed to QML via `setContextProperty`.
-- **System layer** — GIO (`GioTransferWorker`) for transfers, UDisks2 over DBus for devices, `wl-copy` for clipboard.
+- **QML frontend** (`src/qml/`): all rendering. `Main.qml` wires tab state, selection, and shortcuts. Views (`FileGridView`, `FileDetailedView`, `FileMillerView`) are switched by `FileViewContainer`. The [Quill](https://github.com/soyeb-jim285/quill) component library provides themed Buttons, TextFields, Cards, etc.
+- **C++ backend** (`src/models/`, `src/services/`, `src/providers/`): `QAbstractListModel` subclasses for files, tabs, bookmarks, devices. Async services for clipboard, file operations, search, disk usage, previews. Exposed to QML via `setContextProperty`.
+- **System layer**: GIO (`GioTransferWorker`) for transfers, UDisks2 over DBus for devices, `wl-copy` for clipboard.
 
 ---
 
@@ -421,7 +450,7 @@ Issues and PRs welcome! A few notes:
 - Tests are off in the build recipe above; configure with `-DBUILD_TESTS=ON` and run `ctest --test-dir build`
 - Pull requests are built and tested automatically by the `Build` workflow
 - Match the existing code style (4-space indent for QML and C++)
-- The project uses Git submodules — `git submodule update --init --recursive` after pulling
+- The project uses Git submodules, so run `git submodule update --init --recursive` after pulling
 - AppImage builds are produced automatically on `v*` tags by the GitHub Actions workflow
 
 ---
