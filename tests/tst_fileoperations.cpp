@@ -15,6 +15,7 @@
 #include <unistd.h>
 #include "testdir.h"
 #include "services/fileoperations.h"
+#include "services/xdgtrash.h"
 
 class TestFileOperations : public QObject
 {
@@ -46,29 +47,20 @@ class TestFileOperations : public QObject
         return {};
     }
 
+    // Built from the on-disk entry rather than `gio list trash:///`, so the
+    // trash:// call sites stay covered on machines and CI containers with no
+    // gvfs session daemon — which is the whole point of reading the trash
+    // directly.
     static QString findTrashEntryUri(const QString &originalPath)
     {
-        QProcess proc;
-        proc.start("gio", {
-            "list",
-            "-l",
-            "-u",
-            "-a",
-            "trash::orig-path",
-            "trash:///"
-        });
-        if (!proc.waitForFinished(5000) || proc.exitCode() != 0)
+        const QString entryPath = findTrashEntryPath(originalPath);
+        if (entryPath.isEmpty())
             return {};
 
-        const QStringList lines = QString::fromUtf8(proc.readAllStandardOutput()).split('\n', Qt::SkipEmptyParts);
-        for (const QString &line : lines) {
-            if (!line.contains("trash::orig-path=" + originalPath))
-                continue;
-
-            return line.section('\t', 0, 0).trimmed();
-        }
-
-        return {};
+        QUrl uri;
+        uri.setScheme("trash");
+        uri.setPath("/" + QFileInfo(entryPath).fileName());
+        return uri.toString(QUrl::FullyEncoded);
     }
 
     static bool runCommand(const QString &program, const QStringList &args,
@@ -993,6 +985,94 @@ private slots:
                  qPrintable(spy.at(0).at(1).toString()));
         QVERIFY(findTrashEntryUri(dirPath).isEmpty());
 
+        QDir(testPath).removeRecursively();
+    }
+
+    void testDeleteFromTrashRemovesMetadata()
+    {
+        const QString uniqueId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        const QString testPath = QDir::homePath() + "/.cache/hyprfm-test-trash-meta-" + uniqueId;
+        QVERIFY(QDir().mkpath(testPath));
+        const QString filePath = testPath + "/meta_me.txt";
+        {
+            QFile f(filePath);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("meta");
+            f.close();
+        }
+
+        FileOperations ops;
+        QSignalSpy spy(&ops, &FileOperations::operationFinished);
+        ops.trashFiles({filePath});
+        if (!spy.wait(5000) || !spy.at(0).at(0).toBool())
+            QSKIP("trashing is not supported in this environment");
+
+        const QString trashedPath = findTrashEntryPath(filePath);
+        if (trashedPath.isEmpty())
+            QSKIP("Could not locate trashed file metadata");
+
+        const QString infoPath = XdgTrash::infoPathFor(trashedPath);
+        QVERIFY(!infoPath.isEmpty());
+        QVERIFY(QFile::exists(infoPath));
+
+        spy.clear();
+        ops.deleteFiles({trashedPath});
+        QVERIFY(spy.wait(10000));
+        QVERIFY2(spy.at(0).at(0).toBool(), qPrintable(spy.at(0).at(1).toString()));
+
+        QVERIFY(!QFile::exists(trashedPath));
+        // The sidecar has to go with the file, or the trash keeps growing
+        // metadata for items that no longer exist.
+        QVERIFY(!QFile::exists(infoPath));
+
+        QDir(testPath).removeRecursively();
+    }
+
+    void testRestoreDoesNotOverwriteExistingFile()
+    {
+        const QString uniqueId = QUuid::createUuid().toString(QUuid::WithoutBraces);
+        const QString testPath = QDir::homePath() + "/.cache/hyprfm-test-restore-clash-" + uniqueId;
+        QVERIFY(QDir().mkpath(testPath));
+        const QString filePath = testPath + "/clash.txt";
+        {
+            QFile f(filePath);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("original");
+            f.close();
+        }
+
+        FileOperations ops;
+        QSignalSpy spy(&ops, &FileOperations::operationFinished);
+        ops.trashFiles({filePath});
+        if (!spy.wait(5000) || !spy.at(0).at(0).toBool())
+            QSKIP("trashing is not supported in this environment");
+
+        const QString trashedPath = findTrashEntryPath(filePath);
+        if (trashedPath.isEmpty())
+            QSKIP("Could not locate trashed file metadata");
+
+        // Something new now occupies the original location. Restoring must
+        // report an error rather than silently destroying it.
+        {
+            QFile f(filePath);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write("replacement");
+            f.close();
+        }
+
+        spy.clear();
+        ops.restoreFromTrash({trashedPath});
+        QVERIFY(spy.wait(10000));
+        QCOMPARE(spy.at(0).at(0).toBool(), false);
+
+        QFile check(filePath);
+        QVERIFY(check.open(QIODevice::ReadOnly));
+        QCOMPARE(check.readAll(), QByteArray("replacement"));
+        check.close();
+        QVERIFY(QFile::exists(trashedPath));
+
+        QFile::remove(trashedPath);
+        XdgTrash::removeInfo(trashedPath);
         QDir(testPath).removeRecursively();
     }
 

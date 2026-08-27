@@ -47,6 +47,7 @@ add_test(NAME tst_bookmarkmodel COMMAND tst_bookmarkmodel)
 
 add_executable(tst_fileoperations tst_fileoperations.cpp
     ${CMAKE_SOURCE_DIR}/src/services/fileoperations.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/xdgtrash.cpp
     ${CMAKE_SOURCE_DIR}/src/services/giotransferworker.cpp
 )
 target_include_directories(tst_fileoperations PRIVATE ${CMAKE_SOURCE_DIR}/src)
@@ -60,7 +61,9 @@ set_tests_properties(tst_fileoperations PROPERTIES
 
 add_executable(tst_undomanager tst_undomanager.cpp
     ${CMAKE_SOURCE_DIR}/src/services/undomanager.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/xdgtrash.cpp
     ${CMAKE_SOURCE_DIR}/src/services/fileoperations.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/xdgtrash.cpp
     ${CMAKE_SOURCE_DIR}/src/services/giotransferworker.cpp
 )
 target_include_directories(tst_undomanager PRIVATE ${CMAKE_SOURCE_DIR}/src)
@@ -92,6 +95,7 @@ add_test(NAME tst_diskusageservice COMMAND tst_diskusageservice)
 
 add_executable(tst_filesystemmodel tst_filesystemmodel.cpp
     ${CMAKE_SOURCE_DIR}/src/models/filesystemmodel.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/xdgtrash.cpp
     ${CMAKE_SOURCE_DIR}/src/services/gitstatusservice.cpp
 )
 target_include_directories(tst_filesystemmodel PRIVATE
@@ -105,6 +109,7 @@ add_executable(tst_detailedview tst_detailedview.cpp viewharness.h
     ${CMAKE_SOURCE_DIR}/src/services/configmanager.cpp
     ${CMAKE_SOURCE_DIR}/src/services/themeloader.cpp
     ${CMAKE_SOURCE_DIR}/src/models/filesystemmodel.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/xdgtrash.cpp
     ${CMAKE_SOURCE_DIR}/src/services/gitstatusservice.cpp
 )
 target_include_directories(tst_detailedview PRIVATE
@@ -123,6 +128,7 @@ add_executable(tst_millerview tst_millerview.cpp viewharness.h
     ${CMAKE_SOURCE_DIR}/src/services/configmanager.cpp
     ${CMAKE_SOURCE_DIR}/src/services/themeloader.cpp
     ${CMAKE_SOURCE_DIR}/src/models/filesystemmodel.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/xdgtrash.cpp
     ${CMAKE_SOURCE_DIR}/src/services/gitstatusservice.cpp
     ${CMAKE_SOURCE_DIR}/src/services/previewservice.cpp
     ${CMAKE_SOURCE_DIR}/src/services/metadataextractor.cpp
@@ -144,6 +150,7 @@ add_executable(tst_toolbar tst_toolbar.cpp viewharness.h
     ${CMAKE_SOURCE_DIR}/src/services/configmanager.cpp
     ${CMAKE_SOURCE_DIR}/src/services/themeloader.cpp
     ${CMAKE_SOURCE_DIR}/src/models/filesystemmodel.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/xdgtrash.cpp
     ${CMAKE_SOURCE_DIR}/src/services/gitstatusservice.cpp
     ${CMAKE_SOURCE_DIR}/src/models/tablistmodel.cpp
     ${CMAKE_SOURCE_DIR}/src/models/tabmodel.cpp
@@ -159,18 +166,21 @@ add_executable(tst_mainwindow tst_mainwindow.cpp
     ${CMAKE_SOURCE_DIR}/src/services/themeloader.cpp
     ${CMAKE_SOURCE_DIR}/src/services/clipboardmanager.cpp
     ${CMAKE_SOURCE_DIR}/src/services/fileoperations.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/xdgtrash.cpp
     ${CMAKE_SOURCE_DIR}/src/services/giotransferworker.cpp
     ${CMAKE_SOURCE_DIR}/src/services/draghelper.cpp
     ${CMAKE_SOURCE_DIR}/src/models/tabmodel.cpp
     ${CMAKE_SOURCE_DIR}/src/models/tablistmodel.cpp
     ${CMAKE_SOURCE_DIR}/src/models/bookmarkmodel.cpp
     ${CMAKE_SOURCE_DIR}/src/models/filesystemmodel.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/xdgtrash.cpp
     ${CMAKE_SOURCE_DIR}/src/models/devicemodel.cpp
     ${CMAKE_SOURCE_DIR}/src/models/recentfilesmodel.cpp
     ${CMAKE_SOURCE_DIR}/src/models/searchresultsmodel.cpp
     ${CMAKE_SOURCE_DIR}/src/models/searchproxymodel.cpp
     ${CMAKE_SOURCE_DIR}/src/services/searchservice.cpp
     ${CMAKE_SOURCE_DIR}/src/services/undomanager.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/xdgtrash.cpp
     ${CMAKE_SOURCE_DIR}/src/services/previewservice.cpp
     ${CMAKE_SOURCE_DIR}/src/services/diskusageservice.cpp
     ${CMAKE_SOURCE_DIR}/src/services/remoteaccessservice.cpp
@@ -236,6 +246,7 @@ add_test(NAME tst_searchresultsmodel COMMAND tst_searchresultsmodel)
 add_executable(tst_searchproxymodel tst_searchproxymodel.cpp
     ${CMAKE_SOURCE_DIR}/src/models/searchproxymodel.cpp
     ${CMAKE_SOURCE_DIR}/src/models/filesystemmodel.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/xdgtrash.cpp
     ${CMAKE_SOURCE_DIR}/src/models/searchresultsmodel.cpp
     ${CMAKE_SOURCE_DIR}/src/services/gitstatusservice.cpp
 )
@@ -291,3 +302,10 @@ add_test(NAME tst_cli_version COMMAND hyprfm --version)
 set_tests_properties(tst_cli_version PROPERTIES
     PASS_REGULAR_EXPRESSION "^hyprfm [0-9]+\\.[0-9]+\\.[0-9]+"
 )
+
+add_executable(tst_xdgtrash tst_xdgtrash.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/xdgtrash.cpp
+)
+target_include_directories(tst_xdgtrash PRIVATE ${CMAKE_SOURCE_DIR}/src)
+target_link_libraries(tst_xdgtrash PRIVATE Qt6::Test Qt6::Core)
+add_test(NAME tst_xdgtrash COMMAND tst_xdgtrash)
