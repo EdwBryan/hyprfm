@@ -152,6 +152,7 @@ private:
     bool isRemoteRoot() const;
     QVariantMap remoteFileProperties(const QString &path) const;
     QVariantMap trashFileProperties(const QString &path) const;
+    const QVariantMap *findTrashEntry(const QString &path) const;
 
     QString m_rootPath;
     bool m_showHidden = false;

@@ -9,6 +9,7 @@
 #include <QProcess>
 #include <QUuid>
 #include "models/filesystemmodel.h"
+#include "services/xdgtrash.h"
 #include "services/gitstatusservice.h"
 #include "testdir.h"
 
@@ -233,25 +234,30 @@ private slots:
         model.setSynchronousReload(true);
         model.setRootPath("trash:///");
 
-        QString foundUri;
+        QString found;
         for (int i = 0; i < model.rowCount(); ++i) {
             if (model.fileName(i) == fileName) {
-                foundUri = model.filePath(i);
+                found = model.filePath(i);
                 break;
             }
         }
 
-        QVERIFY(!foundUri.isEmpty());
-        QVERIFY(foundUri.startsWith("trash:///"));
+        QVERIFY(!found.isEmpty());
+        // Trash rows carry the real path under <trash>/files, not a trash://
+        // URI: that is what lets delete, restore and preview work without a
+        // gvfs session daemon.
+        QVERIFY(!found.startsWith("trash:///"));
+        QVERIFY(QFileInfo(found).isAbsolute());
+        QVERIFY(found.contains("/Trash/files/"));
+        QVERIFY(QFileInfo::exists(found));
 
-        const QVariantMap props = model.fileProperties(foundUri);
+        const QVariantMap props = model.fileProperties(found);
         QCOMPARE(props.value("name").toString(), fileName);
         QCOMPARE(props.value("originalPath").toString(), filePath);
         QVERIFY(props.value("isTrashItem").toBool());
 
-        QProcess removeProc;
-        removeProc.start("gio", {"remove", "-f", foundUri});
-        QVERIFY(removeProc.waitForFinished(5000));
+        QVERIFY(QFile::remove(found));
+        XdgTrash::removeInfo(found);
     }
 
     // 7. Hidden files

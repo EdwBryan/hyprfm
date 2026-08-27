@@ -1,5 +1,6 @@
 #include "services/fileoperations.h"
 #include "services/giotransferworker.h"
+#include "services/xdgtrash.h"
 #include <QBuffer>
 #include <QClipboard>
 #include <QDesktopServices>
@@ -82,18 +83,6 @@ QString entryNameError(const QString &name)
     if (name.contains(QLatin1Char('/')) || name.contains(QChar(0)))
         return QStringLiteral("Names cannot contain '/'");
     return {};
-}
-
-// Every trash:// operation goes through gvfsd-trash. Without gvfs installed
-// GLib has no backend for the scheme at all and answers a bare "Operation not
-// supported" (issue #10) — say what is actually missing.
-QString trashErrorMessage(GError *err, const QString &fallback)
-{
-    if (!err)
-        return fallback;
-    if (err->domain == G_IO_ERROR && err->code == G_IO_ERROR_NOT_SUPPORTED)
-        return QStringLiteral("Browsing the trash needs gvfs installed (gvfsd-trash)");
-    return QString::fromUtf8(err->message);
 }
 
 bool isUriPath(const QString &path)
@@ -616,14 +605,9 @@ QString trashUriRootPath()
     return QStringLiteral("trash:///");
 }
 
-QString homeTrashRootPath()
-{
-    return QDir::cleanPath(QDir::homePath() + "/.local/share/Trash");
-}
-
 QString homeTrashFilesPath()
 {
-    return homeTrashRootPath() + "/files";
+    return XdgTrash::homeRoot() + "/files";
 }
 
 QString existingLookupPathFor(const QString &path)
@@ -660,7 +644,7 @@ QStringList trashRootCandidatesForPath(const QString &path)
         }
     }
 
-    roots.append(homeTrashRootPath());
+    roots.append(XdgTrash::homeRoot());
     roots.removeDuplicates();
     return roots;
 }
@@ -683,24 +667,35 @@ QString matchingTrashFilesRoot(const QString &path)
     return {};
 }
 
-QString trashUriForPath(const QString &path)
+// Resolves whatever the UI hands us to a real path under <trash>/files. The
+// trash view uses those directly now; a trash:// URI from a saved session or
+// an older caller is matched by name against every trash root. Returns empty
+// for anything not inside a trash directory, so callers can't be tricked into
+// deleting outside one.
+QString localTrashPathFor(const QString &path)
 {
-    const QUrl url(path);
-    if (url.scheme() == "trash")
-        return url.toString(QUrl::FullyEncoded);
+    const QString normalized = QDir::cleanPath(path);
+    if (!isTrashUriPath(normalized))
+        return matchingTrashFilesRoot(normalized).isEmpty() ? QString() : normalized;
 
-    const QString filesRoot = matchingTrashFilesRoot(path);
-    if (filesRoot.isEmpty())
+    QString relative = QUrl(normalized).path();
+    while (relative.startsWith(QLatin1Char('/')))
+        relative.remove(0, 1);
+    if (relative.isEmpty())
         return {};
 
-    const QString relativePath = QDir::cleanPath(QDir(filesRoot).relativeFilePath(QDir::cleanPath(path)));
-    if (relativePath.isEmpty() || relativePath == "." || relativePath.startsWith("../"))
-        return {};
-
-    QUrl trashUrl;
-    trashUrl.setScheme("trash");
-    trashUrl.setPath("/" + QDir::fromNativeSeparators(relativePath));
-    return trashUrl.toString(QUrl::FullyEncoded);
+    const QStringList roots = XdgTrash::roots();
+    for (const QString &root : roots) {
+        const QString filesRoot = QDir(root).filePath(QStringLiteral("files"));
+        const QString candidate = QDir::cleanPath(filesRoot + QLatin1Char('/') + relative);
+        // cleanPath resolves ".." segments, so re-check containment before
+        // handing the path to anything that deletes recursively.
+        if (candidate != filesRoot && !candidate.startsWith(filesRoot + QLatin1Char('/')))
+            continue;
+        if (QFileInfo::exists(candidate))
+            return candidate;
+    }
+    return {};
 }
 
 enum class ArchiveKind {
@@ -1131,69 +1126,49 @@ int FileOperations::restoreFromTrash(const QStringList &paths)
         [paths](ProgressReporter report) -> QString {
             QString lastError;
             const int total = paths.size();
-            // Same XDG_DATA_HOME issue as trashFiles: under Flatpak the
-            // GLib trash:// URIs resolve to the sandbox trash, not the
-            // host's. Shell out to host gio for restore.
-            const bool inFlatpak = runningInFlatpak();
+            // Restore reads the item's own .trashinfo instead of asking gvfs
+            // for trash::orig-path, so it works with no session daemon. That
+            // also fixes Flatpak, which used to need a host `gio` hop because
+            // the sandbox's XDG_DATA_HOME pointed gvfs at an empty trash.
             for (int i = 0; i < total; ++i) {
-                const QString uri = trashUriForPath(paths[i]);
-                if (uri.isEmpty())
+                const QString localPath = localTrashPathFor(paths[i]);
+                if (localPath.isEmpty())
                     continue;
 
                 report(i, total, locationFileName(paths[i]));
 
-                if (inFlatpak) {
-                    QProcess proc;
-                    proc.start(QStringLiteral("flatpak-spawn"),
-                               {QStringLiteral("--host"), QStringLiteral("gio"),
-                                QStringLiteral("trash"), QStringLiteral("--restore"), uri});
-                    proc.waitForFinished(10000);
-                    if (proc.exitCode() != 0) {
-                        const QString err = QString::fromUtf8(proc.readAllStandardError()).trimmed();
-                        if (!err.isEmpty())
-                            lastError = err;
-                    }
+                const XdgTrash::Entry entry = XdgTrash::readEntry(localPath);
+                if (entry.originalPath.isEmpty()) {
+                    lastError = QStringLiteral("Could not determine where %1 came from")
+                                    .arg(locationFileName(localPath));
                     continue;
                 }
 
-                GFile *trashFile = g_file_new_for_uri(uri.toUtf8().constData());
-                GError *gErr = nullptr;
-                GFileInfo *info = g_file_query_info(trashFile,
-                    G_FILE_ATTRIBUTE_TRASH_ORIG_PATH,
-                    G_FILE_QUERY_INFO_NONE, nullptr, &gErr);
-
-                if (!info) {
-                    lastError = trashErrorMessage(gErr, QStringLiteral("Could not read trash entry"));
-                    if (gErr) g_error_free(gErr);
-                    g_object_unref(trashFile);
+                // Never clobber whatever now sits at the original location:
+                // the user has no way to get it back if we do.
+                if (QFileInfo::exists(entry.originalPath)) {
+                    lastError = QStringLiteral("%1 already exists at the original location")
+                                    .arg(locationFileName(entry.originalPath));
                     continue;
                 }
 
-                const char *origPath = g_file_info_get_attribute_byte_string(info, G_FILE_ATTRIBUTE_TRASH_ORIG_PATH);
-                if (!origPath) {
-                    lastError = QStringLiteral("Could not determine original path");
-                    g_object_unref(info);
-                    g_object_unref(trashFile);
+                const QString parent = QFileInfo(entry.originalPath).absolutePath();
+                if (!parent.isEmpty() && !QDir().mkpath(parent)) {
+                    lastError = QStringLiteral("Could not recreate %1").arg(parent);
                     continue;
                 }
 
-                GFile *destFile = g_file_new_for_path(origPath);
-                GFile *parent = g_file_get_parent(destFile);
-                if (parent) {
-                    GError *mkErr = nullptr;
-                    g_file_make_directory_with_parents(parent, nullptr, &mkErr);
-                    if (mkErr) g_error_free(mkErr);
-                    g_object_unref(parent);
+                // ponytail: rename only. The spec keeps an item on the volume
+                // it was deleted from, so this is always a same-filesystem
+                // move; add a copy+delete fallback if a cross-device trash
+                // ever turns up in the wild.
+                if (!QDir().rename(localPath, entry.originalPath)) {
+                    lastError = QStringLiteral("Could not restore %1")
+                                    .arg(locationFileName(localPath));
+                    continue;
                 }
 
-                GError *mvErr = nullptr;
-                if (!g_file_move(trashFile, destFile, G_FILE_COPY_NONE, nullptr, nullptr, nullptr, &mvErr)) {
-                    if (mvErr) { lastError = QString::fromUtf8(mvErr->message); g_error_free(mvErr); }
-                }
-
-                g_object_unref(info);
-                g_object_unref(destFile);
-                g_object_unref(trashFile);
+                XdgTrash::removeInfo(localPath);
             }
             return lastError;
         });
@@ -1296,7 +1271,22 @@ int FileOperations::deleteFiles(const QStringList &paths)
             QString lastError;
             const int total = paths.size();
             for (int i = 0; i < total; ++i) {
-                const QString normalized = normalizeLocation(paths[i]);
+                QString normalized = normalizeLocation(paths[i]);
+
+                // Deleting from the trash goes through the filesystem, not
+                // gvfs: the trash backend answers g_file_delete() on anything
+                // inside a trashed folder with "Items in the trash may not be
+                // modified", which is what made non-empty folders unremovable.
+                if (isTrashUriPath(normalized)) {
+                    const QString localPath = localTrashPathFor(normalized);
+                    if (localPath.isEmpty()) {
+                        lastError = QStringLiteral("Could not locate %1 in the trash")
+                                        .arg(locationFileName(normalized));
+                        continue;
+                    }
+                    normalized = localPath;
+                }
+
                 report(i, total, locationFileName(normalized));
 
                 if (isUriPath(normalized)) {
@@ -1310,13 +1300,19 @@ int FileOperations::deleteFiles(const QStringList &paths)
                     // A symlink to a directory must be unlinked, never
                     // descended: isDir() follows the link and
                     // removeRecursively() would empty the target.
-                    if (info.isDir() && !info.isSymLink()) {
-                        if (!QDir(normalized).removeRecursively())
-                            lastError = QStringLiteral("Failed to delete one or more items");
-                    } else {
-                        if (!QFile::remove(normalized))
-                            lastError = QStringLiteral("Failed to delete one or more items");
-                    }
+                    bool removed = false;
+                    if (info.isDir() && !info.isSymLink())
+                        removed = QDir(normalized).removeRecursively();
+                    else
+                        removed = QFile::remove(normalized);
+
+                    if (!removed)
+                        lastError = QStringLiteral("Failed to delete one or more items");
+                    else
+                        // No-op unless this was a top-level trash entry;
+                        // otherwise the trash accumulates metadata for files
+                        // that no longer exist.
+                        XdgTrash::removeInfo(normalized);
                 }
             }
             return lastError;
@@ -1623,61 +1619,33 @@ int FileOperations::emptyTrash()
     return startSimpleOperation(
         QStringLiteral("Emptying trash..."), {},
         [](ProgressReporter report) -> QString {
-            // Inside a Flatpak the GLib trash:// URI resolves to the
-            // sandbox's trash, not the host's. Shell out to host gio so we
-            // empty the user's real trash. We lose per-file progress in
-            // this branch (gio trash --empty is one shot) but the result
-            // matches what the user expects.
-            if (runningInFlatpak()) {
-                report(0, 1, QStringLiteral("Emptying trash..."));
-                QProcess proc;
-                proc.start(QStringLiteral("flatpak-spawn"),
-                           {QStringLiteral("--host"), QStringLiteral("gio"),
-                            QStringLiteral("trash"), QStringLiteral("--empty")});
-                proc.waitForFinished(60000);
-                if (proc.exitCode() != 0) {
-                    const QString err = QString::fromUtf8(proc.readAllStandardError()).trimmed();
-                    return err.isEmpty() ? QStringLiteral("gio trash --empty failed") : err;
-                }
+            // Walks the trash directories itself instead of enumerating
+            // trash:// through gvfs, so this works with no session daemon and
+            // covers .Trash-<uid> on other volumes at the same time. It also
+            // sidesteps the GVFS rule that items inside a trashed folder may
+            // not be modified, which used to leave non-empty folders behind.
+            const QList<XdgTrash::Entry> entries = XdgTrash::scan();
+            if (entries.isEmpty())
                 return QString();
-            }
 
-            // First pass: count items
-            GFile *trash = g_file_new_for_uri("trash:///");
-            GError *enumErr = nullptr;
-            GFileEnumerator *counter = g_file_enumerate_children(trash,
-                G_FILE_ATTRIBUTE_STANDARD_NAME,
-                G_FILE_QUERY_INFO_NOFOLLOW_SYMLINKS, nullptr, &enumErr);
-
-            QStringList names;
-            if (counter) {
-                GFileInfo *ci = nullptr;
-                while ((ci = g_file_enumerator_next_file(counter, nullptr, nullptr)) != nullptr) {
-                    names.append(QString::fromUtf8(g_file_info_get_name(ci)));
-                    g_object_unref(ci);
-                }
-                g_file_enumerator_close(counter, nullptr, nullptr);
-                g_object_unref(counter);
-            } else {
-                const QString err = trashErrorMessage(enumErr, QStringLiteral("Could not enumerate trash"));
-                if (enumErr) g_error_free(enumErr);
-                g_object_unref(trash);
-                return err;
-            }
-
-            // Second pass: delete with progress
             QString lastError;
-            const int total = names.size();
+            const int total = entries.size();
             for (int i = 0; i < total; ++i) {
-                report(i, total, names[i]);
-                GFile *child = g_file_get_child(trash, names[i].toUtf8().constData());
-                QString err;
-                if (!deleteGFileRecursive(child, &err) && !err.isEmpty())
-                    lastError = err;
-                g_object_unref(child);
-            }
+                const XdgTrash::Entry &entry = entries.at(i);
+                report(i, total, entry.name);
 
-            g_object_unref(trash);
+                const QFileInfo info(entry.filesPath);
+                bool removed = false;
+                if (info.isDir() && !info.isSymLink())
+                    removed = QDir(entry.filesPath).removeRecursively();
+                else
+                    removed = QFile::remove(entry.filesPath);
+
+                if (removed)
+                    XdgTrash::removeInfo(entry.filesPath);
+                else
+                    lastError = QStringLiteral("Could not delete %1").arg(entry.name);
+            }
             return lastError;
         });
 }

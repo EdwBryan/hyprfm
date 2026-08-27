@@ -1,71 +1,41 @@
 #include "services/undomanager.h"
+#include "services/xdgtrash.h"
 #include "services/fileoperations.h"
 
 #include <QFileInfo>
 #include <QDir>
 #include <QFile>
 #include <QDateTime>
-#include <QProcess>
-#include <QRegularExpression>
 #include <QUrl>
 
 #include <algorithm>
 
 namespace {
 
-QHash<QString, QString> parseGioAttributes(const QString &attributeText)
+// Finds the most recently trashed copy of a path by reading the trash
+// directories, not by asking gvfs for a trash:// listing — undoing a trash
+// has to work on installs with no gvfs session daemon, same as the trash
+// view itself. Returns the real path under <trash>/files.
+QString latestTrashedPathForOriginalPath(const QString &originalPath)
 {
-    QHash<QString, QString> attrs;
-    static const QRegularExpression attrRe(R"(([A-Za-z0-9:-]+)=(.*?)(?= [A-Za-z0-9:-]+=|$))");
-
-    auto it = attrRe.globalMatch(attributeText.trimmed());
-    while (it.hasNext()) {
-        const auto match = it.next();
-        attrs.insert(match.captured(1), match.captured(2));
-    }
-
-    return attrs;
-}
-
-QString latestTrashUriForOriginalPath(const QString &originalPath)
-{
-    QProcess proc;
-    proc.start("gio", {
-        "list",
-        "-h",
-        "-l",
-        "-u",
-        "-a",
-        "trash::orig-path,trash::deletion-date",
-        "trash:///"
-    });
-    if (!proc.waitForFinished(5000) || proc.exitCode() != 0)
-        return {};
-
-    QString latestUri;
+    QString latestPath;
     QDateTime latestDeletedAt;
-    const QStringList lines = QString::fromUtf8(proc.readAllStandardOutput()).split('\n', Qt::SkipEmptyParts);
-    for (const QString &line : lines) {
-        const QStringList fields = line.split('\t');
-        if (fields.size() < 4)
+
+    const QList<XdgTrash::Entry> entries = XdgTrash::scan();
+    for (const XdgTrash::Entry &entry : entries) {
+        if (QDir::cleanPath(entry.originalPath) != originalPath)
             continue;
 
-        const QString uri = fields.at(0).trimmed();
-        const auto attrs = parseGioAttributes(fields.mid(3).join(" "));
-        if (QDir::cleanPath(attrs.value("trash::orig-path")) != originalPath)
-            continue;
-
-        QDateTime deletedAt = QDateTime::fromString(attrs.value("trash::deletion-date"), Qt::ISODate);
-        if (!deletedAt.isValid())
-            deletedAt = QDateTime::fromString(attrs.value("trash::deletion-date"), Qt::ISODateWithMs);
-
-        if (latestUri.isEmpty() || !latestDeletedAt.isValid() || deletedAt > latestDeletedAt) {
-            latestUri = uri;
-            latestDeletedAt = deletedAt;
+        // An entry with no readable .trashinfo has no deletion date to
+        // compare, so it only wins if nothing better has been seen.
+        if (latestPath.isEmpty() || !latestDeletedAt.isValid()
+            || (entry.deletedAt.isValid() && entry.deletedAt > latestDeletedAt)) {
+            latestPath = entry.filesPath;
+            latestDeletedAt = entry.deletedAt;
         }
     }
 
-    return latestUri;
+    return latestPath;
 }
 
 QVariantList prepareOperations(const QVariantList &operations, FileOperations *fileOps)
@@ -399,7 +369,7 @@ void UndoManager::restoreFromTrash(const QStringList &originalPaths)
     QStringList restoreTargets;
 
     for (const QString &origPath : originalPaths) {
-        const QString trashUri = latestTrashUriForOriginalPath(QDir::cleanPath(origPath));
+        const QString trashUri = latestTrashedPathForOriginalPath(QDir::cleanPath(origPath));
         if (!trashUri.isEmpty())
             restoreTargets.append(trashUri);
     }

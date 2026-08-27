@@ -1,5 +1,6 @@
 #include "models/filesystemmodel.h"
 #include "services/gitstatusservice.h"
+#include "services/xdgtrash.h"
 #include <QLocale>
 #include <QDateTime>
 #include <QDebug>
@@ -480,48 +481,32 @@ QVariantMap buildRemotePropertiesFromEntry(const QVariantMap &entry)
     return props;
 }
 
-QVariantMap buildTrashEntryFromLine(const QString &line)
+// Builds a trash row straight from the on-disk entry. filePath is the real
+// path under <trash>/files, not a trash:// URI: FileOperations already
+// recognises those (matchingTrashFilesRoot/isTrashPath), so delete, restore
+// and preview all work on them without gvfs in the loop.
+QVariantMap buildTrashEntryFromLocal(const XdgTrash::Entry &source)
 {
-    static const QRegularExpression lineRe(R"(^([^\t]+)\t(\d+)\t\(([^)]*)\)(?:\t(.*))?$)");
-    const auto match = lineRe.match(line.trimmed());
-    if (!match.hasMatch())
+    const QFileInfo info(source.filesPath);
+    if (!info.exists())
         return {};
 
-    const QString uri = match.captured(1).trimmed();
-    const qint64 size = match.captured(2).toLongLong();
-    const QString typeToken = match.captured(3).trimmed().toLower();
-    const auto attrs = parseGioAttributes(match.captured(4));
+    const bool isDir = info.isDir();
+    const QString displayName = source.name;
+    const qint64 size = isDir ? 0 : info.size();
+    const QDateTime modified = info.lastModified();
+    const QDateTime deletedAt = source.deletedAt;
 
-    const bool isDir = typeToken.contains("directory");
-    QString displayName = attrs.value("standard::display-name");
-    if (displayName.isEmpty()) {
-        const QUrl url(uri);
-        displayName = url.fileName();
-        if (displayName.isEmpty())
-            displayName = attrs.value("standard::name");
-    }
-
-    QDateTime modified;
-    const QString modifiedSeconds = attrs.value("time::modified");
-    if (!modifiedSeconds.isEmpty())
-        modified = QDateTime::fromSecsSinceEpoch(modifiedSeconds.toLongLong());
-
-    QDateTime deletedAt;
-    const QString deletionDate = attrs.value("trash::deletion-date");
-    if (!deletionDate.isEmpty()) {
-        deletedAt = QDateTime::fromString(deletionDate, Qt::ISODate);
-        if (!deletedAt.isValid())
-            deletedAt = QDateTime::fromString(deletionDate, Qt::ISODateWithMs);
-    }
-
-    const QString contentType = attrs.value("standard::content-type");
+    const QString contentType = isDir
+        ? QStringLiteral("inode/directory")
+        : mimeDb().mimeTypeForFile(info).name();
     const QString mimeDescription = contentType.isEmpty()
         ? QString()
         : mimeDb().mimeTypeForName(contentType).comment();
 
     QVariantMap entry;
     entry["fileName"] = displayName;
-    entry["filePath"] = uri;
+    entry["filePath"] = source.filesPath;
     entry["fileSize"] = isDir ? QVariant(-1) : QVariant(size);
     entry["fileSizeText"] = isDir ? QString() : formattedSize(size);
     entry["fileType"] = fileTypeForEntry(displayName, isDir, contentType);
@@ -529,9 +514,9 @@ QVariantMap buildTrashEntryFromLine(const QString &line)
     entry["fileModifiedText"] = modified.isValid() ? QLocale().toString(modified, QLocale::ShortFormat) : QString();
     entry["filePermissions"] = QString();
     entry["isDir"] = isDir;
-    entry["isSymlink"] = typeToken.contains("symbolic");
+    entry["isSymlink"] = info.isSymLink();
     entry["fileIconName"] = iconNameForEntry(displayName, isDir, contentType);
-    entry["originalPath"] = attrs.value("trash::orig-path");
+    entry["originalPath"] = source.originalPath;
     entry["deletedAt"] = deletedAt;
     entry["deletedAtText"] = deletedAt.isValid() ? QLocale().toString(deletedAt, QLocale::LongFormat) : QString();
     entry["mimeType"] = contentType;
@@ -1422,21 +1407,15 @@ void FileSystemModel::reloadTrash()
         return;
     }
 
-    // Inside a Flatpak this transparently runs `flatpak-spawn --host gio
-    // list ...`. Without the host hop, the sandbox's overridden
-    // XDG_DATA_HOME (~/.var/app/<app-id>/data) makes gio query an empty
-    // sandbox-local trash instead of the user's real ~/.local/share/Trash.
-    const QString output = runHostTool(QStringLiteral("gio"), {
-        QStringLiteral("list"),
-        QStringLiteral("-l"),
-        QStringLiteral("-u"),
-        QStringLiteral("-a"),
-        QStringLiteral("standard::display-name,standard::name,standard::content-type,time::modified,trash::orig-path,trash::deletion-date"),
-        QUrl(m_rootPath).toString(QUrl::FullyEncoded)
-    }, 5000);
-    const QStringList lines = output.split('\n', Qt::SkipEmptyParts);
-    for (const QString &line : lines) {
-        const QVariantMap entry = buildTrashEntryFromLine(line);
+    // Read the trash directories directly rather than asking gvfs for a
+    // trash:// listing. gvfs is a session daemon, so any install without one
+    // (Nix without services.gvfs.enable, AppImage, Flatpak) showed an empty
+    // Trash even with files sitting in ~/.local/share/Trash/files.
+    // XdgTrash::scan() also covers .Trash-<uid> on other mounted volumes,
+    // which the old `gio list trash:///` call did too.
+    const QList<XdgTrash::Entry> found = XdgTrash::scan();
+    for (const XdgTrash::Entry &source : found) {
+        const QVariantMap entry = buildTrashEntryFromLocal(source);
         if (!entry.isEmpty())
             m_trashEntries.append(entry);
     }
@@ -1498,8 +1477,15 @@ QVariantMap FileSystemModel::folderItemCounts(const QStringList &paths) const
 QVariantMap FileSystemModel::fileProperties(const QString &path) const
 {
     const QString normalizedPath = normalizeLocation(path);
+    // Trash rows carry a real path under <trash>/files rather than a trash://
+    // URI, so match against the loaded entries too — otherwise a trashed item
+    // falls through to the plain-file branch and loses originalPath/deletedAt.
     if (isTrashUri(normalizedPath))
         return trashFileProperties(normalizedPath);
+    if (isTrashRoot()) {
+        if (const QVariantMap *entry = findTrashEntry(normalizedPath))
+            return buildTrashProperties(*entry);
+    }
 
     if (isRemoteUri(normalizedPath))
         return remoteFileProperties(normalizedPath);
@@ -1689,12 +1675,19 @@ QVariantMap FileSystemModel::remoteFileProperties(const QString &path) const
     return props;
 }
 
-QVariantMap FileSystemModel::trashFileProperties(const QString &path) const
+const QVariantMap *FileSystemModel::findTrashEntry(const QString &path) const
 {
     for (const auto &entry : m_trashEntries) {
         if (entry.value("filePath").toString() == path)
-            return buildTrashProperties(entry);
+            return &entry;
     }
+    return nullptr;
+}
+
+QVariantMap FileSystemModel::trashFileProperties(const QString &path) const
+{
+    if (const QVariantMap *entry = findTrashEntry(path))
+        return buildTrashProperties(*entry);
 
     QVariantMap props;
     props["name"] = QUrl(path).fileName();
