@@ -18,6 +18,8 @@
 #include <QSaveFile>
 #include <QTimer>
 #include <QFontDatabase>
+#include <QDBusInterface>
+#include <QDBusReply>
 #include <QStyleHints>
 #include <QFileInfo>
 #include <QLocalServer>
@@ -149,6 +151,38 @@ error   = "#f38ba8"  # errors, destructive actions
 )";
 
 } // namespace
+
+
+// org.freedesktop.appearance color-scheme: 0 no preference, 1 dark, 2 light.
+// Published by xdg-desktop-portal, which is what desktop shells write to when
+// the user flips light/dark, so it is available even when Qt cannot see it.
+static bool desktopPrefersLight()
+{
+    QDBusInterface portal(QStringLiteral("org.freedesktop.portal.Desktop"),
+                          QStringLiteral("/org/freedesktop/portal/desktop"),
+                          QStringLiteral("org.freedesktop.portal.Settings"),
+                          QDBusConnection::sessionBus());
+    if (portal.isValid()) {
+        const QDBusReply<QDBusVariant> reply =
+            portal.call(QStringLiteral("Read"), QStringLiteral("org.freedesktop.appearance"),
+                        QStringLiteral("color-scheme"));
+        if (reply.isValid()) {
+            // The portal answers with a variant wrapping a variant, so the
+            // inner one has to be unwrapped or the conversion quietly yields 0
+            // and this falls through to Qt for no reason.
+            bool ok = false;
+            QVariant value = reply.value().variant();
+            if (value.canConvert<QDBusVariant>())
+                value = value.value<QDBusVariant>().variant();
+            const uint scheme = value.toUInt(&ok);
+            if (ok && scheme != 0)
+                return scheme == 2;
+        }
+    }
+    // No portal, or it has no preference: trust Qt when it knows, else assume
+    // dark, which is what this defaulted to before the portal was consulted.
+    return QGuiApplication::styleHints()->colorScheme() == Qt::ColorScheme::Light;
+}
 
 int main(int argc, char *argv[])
 {
@@ -361,28 +395,21 @@ int main(int argc, char *argv[])
     if (themesDir.isEmpty())
         qWarning() << "HyprFM: unable to locate themes directory";
 
-    const auto systemPrefersDark = [&app]() {
-        return app.styleHints()->colorScheme() == Qt::ColorScheme::Dark;
-    };
-    // Bootstrap value only. Once config.toml has been read, light_theme /
-    // dark_theme decide, so a user pairing their own themes is honoured.
-    const QString systemDefaultTheme = systemPrefersDark()
-        ? QStringLiteral("catppuccin-mocha")
-        : QStringLiteral("catppuccin-latte");
+    // Only used the first time, while config.toml has no "theme": pick the
+    // bundled theme that matches the desktop rather than always landing on the
+    // dark one. Qt's own colorScheme() is not enough here -- it reports Unknown
+    // under platform themes that do not forward the portal setting (qt6ct,
+    // Kvantum), which is a common Hyprland setup -- so ask the portal directly
+    // and fall back to Qt, then to dark.
+    const QString systemDefaultTheme = desktopPrefersLight()
+        ? QStringLiteral("catppuccin-latte")
+        : QStringLiteral("catppuccin-mocha");
 
     // Create backend instances
     ConfigManager *config = new ConfigManager(configPath, &app, themeDirs, systemDefaultTheme);
     mark("ConfigManager loaded");
     app.setFont(resolveUiFont(config->fontFamily()));
     new UiFontGuard(&app, [&]() { return resolveUiFont(config->fontFamily()); });
-    config->applySystemColorScheme(systemPrefersDark());
-    // Follow the desktop switching between light and dark while we are running,
-    // instead of only sampling it once at launch.
-    QObject::connect(app.styleHints(), &QStyleHints::colorSchemeChanged, config,
-                     [config, systemPrefersDark](Qt::ColorScheme) {
-                         config->applySystemColorScheme(systemPrefersDark());
-                     });
-
     ThemeLoader *theme = new ThemeLoader(&app);
     theme->loadTheme(config->theme(), themeDirs);
     mark("ThemeLoader loaded");

@@ -327,9 +327,7 @@ Config lives at `~/.config/hyprfm/config.toml`. On first run HyprFM writes it fu
 
 ```toml
 [general]
-# theme = "catppuccin-mocha"   # filename in themes/ without .toml; setting it pins the theme
-light_theme = "catppuccin-latte"  # used while "theme" is unset and the desktop is light
-dark_theme = "catppuccin-mocha"   # used while "theme" is unset and the desktop is dark
+# theme = "catppuccin-mocha"   # filename in themes/ without .toml; unset = follow system light/dark
 icon_theme = "Adwaita"         # system icon theme fallback
 font_family = ""               # UI font; empty = desktop font
 default_view = "grid"          # grid | detailed | miller

@@ -72,11 +72,7 @@ Window {
     property string draftTheme: config.theme
     property string draftFontFamily: config.fontFamily
     property string draftIconTheme: config.iconTheme
-    // Derived from the theme's own background, so it stays truthful for any
-    // theme including ones the user writes. The old name check treated every
-    // theme except catppuccin-latte as dark.
-    readonly property bool draftDarkMode:
-        (0.2126 * Theme.base.r + 0.7152 * Theme.base.g + 0.0722 * Theme.base.b) < 0.5
+    property bool draftDarkMode: true
     property bool draftShowHidden: currentShowHidden
     property bool draftDependencyStartupCheck: config.dependencyStartupCheck
     property bool draftSidebarVisible: currentSidebarVisible
@@ -217,8 +213,17 @@ Window {
         return index >= 0 ? index : fallbackIndex
     }
 
+    // Read from the theme's own background rather than its name. The old
+    // check treated every theme except catppuccin-latte as dark, so any other
+    // light theme showed this toggle stuck on.
+    function isDarkTheme(themeName) {
+        return (0.2126 * Theme.base.r + 0.7152 * Theme.base.g
+                + 0.0722 * Theme.base.b) < 0.5
+    }
+
     function setDraftTheme(themeName) {
         draftTheme = themeName
+        draftDarkMode = isDarkTheme(themeName)
     }
 
     function bindAppearancePreview() {
@@ -277,6 +282,7 @@ Window {
         syncingFromConfig = true
         try {
             draftTheme = config.theme
+            draftDarkMode = isDarkTheme(draftTheme)
             themeOptions = buildOptions(availableThemeValues, draftTheme, "catppuccin-mocha")
 
             draftFontFamily = config.fontFamily
@@ -456,7 +462,7 @@ Window {
                     label: ""
                     checked: root.draftDarkMode
                     onToggled: (value) => {
-                        root.setDraftTheme(value ? config.darkTheme : config.lightTheme)
+                        root.setDraftTheme(value ? "catppuccin-mocha" : "catppuccin-latte")
                         root.applySettingsNow()
                     }
                 }
