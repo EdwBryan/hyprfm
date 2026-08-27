@@ -167,6 +167,20 @@ Or pull it into a system/home-manager flake:
 
 then reference `hyprfm.packages.<system>.default` in `environment.systemPackages` / `home.packages`. The package version is parsed straight from `CMakeLists.txt`, so it always tracks the tree it's built from.
 
+The package carries its own tools — archive handling, previews, search, the
+gvfs client module — so it works out of the box. The one thing it cannot ship
+is the **gvfs daemon**: `gvfsd` and its backends are D-Bus–activated,
+per-session services, so they have to come from the session rather than from an
+application's closure. On NixOS:
+
+```nix
+services.gvfs.enable = true;
+```
+
+Without it the Trash still works — HyprFM reads the trash directories directly
+— but the Network sidebar (`sftp://`, `smb://`, `mtp://`) has nothing to talk
+to. On a non-NixOS host with `nix run`, the distro's own gvfs covers this.
+
 ### Build from source
 
 ```bash

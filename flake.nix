@@ -92,7 +92,44 @@
               pkgs.glib # gio
               pkgs.xdg-utils
               pkgs.wl-clipboard
+
+              # Compress/extract shells out to these by name. Without them
+              # the archive menu entries are present but every one of them
+              # fails, so they are not optional the way the tools below are.
+              pkgs.gnutar
+              pkgs.gzip
+              pkgs.bzip2
+              pkgs.xz
+              pkgs.zstd
+              pkgs.zip
+              pkgs.unzip
+              pkgs.p7zip # 7z
+              pkgs.libarchive # bsdtar, the fallback for rar and odd formats
+
+              # Optional, and each degrades gracefully on its own (search
+              # falls back to a directory walk, previews to plain text) while
+              # the startup dependency check names whatever is missing. These
+              # three are cheap and cover features a user would notice losing.
+              # Deliberately not here: git (+385MB) and exiftool (+127MB) --
+              # this is a --prefix, so a user who has them keeps using theirs,
+              # and the git-status column and metadata panel simply stay empty
+              # for anyone who does not. ffmpeg is out for the same reason.
+              pkgs.fd
+              pkgs.bat
+              pkgs.poppler-utils # pdftoppm, pdfinfo
             ])
+
+            # gvfs ships the client-side GIO module (libgvfsdbus.so). Without
+            # it GIO cannot speak the gvfs protocol at all, so sftp:// smb://
+            # and mtp:// transfers fail even when gvfsd is running — hyprfm
+            # copies to those URIs in-process via g_file_copy(). NixOS with
+            # services.gvfs.enable already exports this, but a plain `nix run`
+            # on a non-NixOS host cannot borrow the host module: it is built
+            # against the host's glib, not this closure's.
+            "--prefix"
+            "GIO_EXTRA_MODULES"
+            ":"
+            "${pkgs.gvfs}/lib/gio/modules:${pkgs.glib-networking}/lib/gio/modules"
           ];
 
           meta = with pkgs.lib; {
