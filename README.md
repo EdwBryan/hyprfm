@@ -60,6 +60,7 @@ HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
   - [File operations](#file-operations-1)
 - [⚙ Configuration](#-configuration)
 - [🎨 Theming](#-theming)
+  - [Light and dark](#light-and-dark)
 - [🧱 Architecture](#-architecture)
 - [🤝 Contributing](#-contributing)
 - [📜 License](#-license)
@@ -438,6 +439,33 @@ error   = "#f38ba8"
 the same table plus a comment per colour, so the directory documents itself.
 
 Themes reload live on save.
+
+### Light and dark
+
+Name two themes as a pair and the Dark Mode switch in Settings flips between
+them:
+
+```toml
+[general]
+light_theme = "rose-pine-dawn"
+dark_theme = "rose-pine"
+```
+
+Both are dropdowns under Settings, so you can set them there instead. `theme`
+is whichever one is currently in effect.
+
+HyprFM does not watch your desktop for light/dark changes. If you want it to
+follow a system-wide toggle, have that toggle rewrite `theme` in
+`config.toml`: the file is watched and the new theme applies immediately, with
+no restart and no need for HyprFM to be running at the time.
+
+```sh
+sed -i 's/^theme = .*/theme = "rose-pine-dawn"/' ~/.config/hyprfm/config.toml
+```
+
+The only time the desktop is consulted is the very first launch, when there is
+no `theme` yet: HyprFM asks the XDG desktop portal whether you prefer light or
+dark so the initial theme matches rather than always starting dark.
 
 ---
 

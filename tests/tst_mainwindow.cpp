@@ -233,10 +233,10 @@ private slots:
         QVERIFY(otherIndex >= 0);
         const QString other = options.at(otherIndex).toString();
 
-        // Go through the dropdown's own commit path. Writing currentIndex
-        // from C++ would not do: a QML binding survives that and re-asserts
-        // itself, while the QML-side assignment inside _commit destroys it,
-        // which is the whole point of this test.
+        // Pick a row the way a user would. The Dropdown reports the choice and
+        // the panel moves currentIndex through its binding; the Dropdown must
+        // not write to it, or that binding is gone and every later change from
+        // elsewhere stops showing up.
         const int pickIndex = otherIndex == 0 ? 1 : 0;
         QVERIFY(QMetaObject::invokeMethod(dropdown, "_commit", Q_ARG(QVariant, pickIndex)));
         QCOMPARE(dropdown->property("currentIndex").toInt(), pickIndex);
