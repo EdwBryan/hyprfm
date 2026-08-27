@@ -119,6 +119,17 @@
               pkgs.poppler-utils # pdftoppm, pdfinfo
             ])
 
+            # File and folder icons come from the system icon theme via
+            # QIcon::setThemeName() (default "Adwaita", falling back through
+            # breeze/Papirus/Adwaita/hicolor). A desktop session normally
+            # provides these through XDG_DATA_DIRS, but `nix run` on a minimal
+            # or non-NixOS host has neither the variable nor the themes, and
+            # every file and folder renders as blank space.
+            "--prefix"
+            "XDG_DATA_DIRS"
+            ":"
+            "${pkgs.adwaita-icon-theme}/share:${pkgs.hicolor-icon-theme}/share"
+
             # gvfs ships the client-side GIO module (libgvfsdbus.so). Without
             # it GIO cannot speak the gvfs protocol at all, so sftp:// smb://
             # and mtp:// transfers fail even when gvfsd is running — hyprfm
