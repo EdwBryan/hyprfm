@@ -35,11 +35,11 @@ HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
 
 ## 🧭 Contents
 
-<!-- Anchors are taken verbatim from GitHub's render. Note that ⌨️ and ⚙️
-     carry a U+FE0F variation selector which GitHub keeps in the slug, so
-     those two links begin with an invisible character. Re-derive them with
+<!-- Heading emoji must not carry a U+FE0F variation selector. GitHub keeps it
+     in the generated slug but percent-encodes it inside a link, so the two
+     never match and the entry silently stops jumping. Verify with
      `gh api repos/OWNER/REPO/readme -H 'Accept: application/vnd.github.html'`
-     if you rename a heading. -->
+     after renaming a heading. -->
 
 - [✨ Features](#-features)
   - [Views](#views)
@@ -53,12 +53,12 @@ HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
   - [AppImage (any distro)](#appimage-any-distro)
   - [Nix (flake)](#nix-flake)
   - [Build from source](#build-from-source)
-- [⌨️ Keyboard shortcuts](#️-keyboard-shortcuts)
+- [⌨ Keyboard shortcuts](#-keyboard-shortcuts)
   - [Navigation](#navigation)
   - [Views](#views-1)
   - [Tabs & windows](#tabs--windows)
   - [File operations](#file-operations-1)
-- [⚙️ Configuration](#️-configuration)
+- [⚙ Configuration](#-configuration)
 - [🎨 Theming](#-theming)
 - [🧱 Architecture](#-architecture)
 - [🤝 Contributing](#-contributing)
@@ -241,7 +241,7 @@ The result lands in the repo root as `HyprFM-<version>-x86_64.AppImage`. The scr
 
 ---
 
-## ⌨️ Keyboard shortcuts
+## ⌨ Keyboard shortcuts
 
 ### Navigation
 
@@ -321,7 +321,7 @@ Shortcuts can be remapped in `~/.config/hyprfm/config.toml` under the `[shortcut
 
 ---
 
-## ⚙️ Configuration
+## ⚙ Configuration
 
 Config lives at `~/.config/hyprfm/config.toml`. On first run HyprFM writes it fully commented; changing settings inside the app rewrites the file without comments, so `~/.config/hyprfm/config.toml.sample` (regenerated on every start) is the always-documented reference.
 
