@@ -151,6 +151,22 @@ The asset name carries the version, so grab the current one from the
 
 The AppImage is fully self-contained — no system Qt installation required.
 
+### Nix (flake)
+
+```bash
+nix run github:soyeb-jim285/hyprfm
+```
+
+Or pull it into a system/home-manager flake:
+
+```nix
+{
+  inputs.hyprfm.url = "github:soyeb-jim285/hyprfm";
+}
+```
+
+then reference `hyprfm.packages.<system>.default` in `environment.systemPackages` / `home.packages`. The package version is parsed straight from `CMakeLists.txt`, so it always tracks the tree it's built from.
+
 ### Build from source
 
 ```bash
