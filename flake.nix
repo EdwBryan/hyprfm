@@ -46,6 +46,34 @@
         )
       );
 
+      # Only the client-side GIO module is usable from an application closure:
+      # gvfsd and its backends are D-Bus-activated per-session services, so a
+      # bundled copy would never be activated. Referencing ${pkgs.gvfs}
+      # directly to get one 292KB shim drags samba, udisks and gtk3 along --
+      # 449MB of daemons that can never run from here. Copy the two libraries
+      # out and repoint their RPATH instead; what is left references only glib
+      # and libc, which the closure already has.
+      gvfsClientModule =
+        pkgs:
+        pkgs.runCommand "gvfs-client-gio-module"
+          { nativeBuildInputs = [ pkgs.patchelf pkgs.removeReferencesTo ]; }
+          ''
+            mkdir -p $out/lib/gio/modules
+            cp ${pkgs.gvfs}/lib/gvfs/libgvfscommon.so $out/lib/
+            cp ${pkgs.gvfs}/lib/gio/modules/libgvfsdbus.so $out/lib/gio/modules/
+            chmod +w $out/lib/libgvfscommon.so $out/lib/gio/modules/libgvfsdbus.so
+            patchelf --set-rpath "$out/lib:${pkgs.glib.out}/lib:${pkgs.stdenv.cc.libc}/lib" \
+              $out/lib/gio/modules/libgvfsdbus.so
+            patchelf --set-rpath "${pkgs.glib.out}/lib:${pkgs.stdenv.cc.libc}/lib" \
+              $out/lib/libgvfscommon.so
+
+            # patchelf leaves the replaced RPATH string in the binary, and nix
+            # scans raw bytes for store hashes -- so without this the copy
+            # still "references" gvfs and drags the whole 449MB back in.
+            remove-references-to -t ${pkgs.gvfs} \
+              $out/lib/libgvfscommon.so $out/lib/gio/modules/libgvfsdbus.so
+          '';
+
       mkHyprfm =
         pkgs:
         pkgs.stdenv.mkDerivation {
@@ -140,7 +168,7 @@
             "--prefix"
             "GIO_EXTRA_MODULES"
             ":"
-            "${pkgs.gvfs}/lib/gio/modules:${pkgs.glib-networking}/lib/gio/modules"
+            "${gvfsClientModule pkgs}/lib/gio/modules:${pkgs.glib-networking}/lib/gio/modules"
           ];
 
           meta = with pkgs.lib; {
