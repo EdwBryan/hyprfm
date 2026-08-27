@@ -289,6 +289,10 @@ Window {
             draftTheme = config.theme
             draftDarkMode = isDarkTheme(draftTheme)
             themeOptions = buildOptions(availableThemeValues, draftTheme, "catppuccin-mocha")
+            draftLightTheme = config.lightTheme
+            draftDarkTheme = config.darkTheme
+            lightThemeOptions = buildOptions(availableThemeValues, draftLightTheme, "catppuccin-latte")
+            darkThemeOptions = buildOptions(availableThemeValues, draftDarkTheme, "catppuccin-mocha")
 
             draftFontFamily = config.fontFamily
             fontOptions = buildFontOptions()

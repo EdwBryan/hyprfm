@@ -1245,6 +1245,7 @@ ApplicationWindow {
 
     Components.SettingsPanel {
         id: settingsPanel
+        objectName: "settingsPanel"
         transientParent: root
         currentShowHidden: fsModel.showHidden
         currentSidebarVisible: root.sidebarVisible

@@ -177,6 +177,35 @@ class TestMainWindow : public QObject
     };
 
 private slots:
+    // Every dropdown in Settings is fed by a list built in
+    // syncFromCurrentState(). Miss one and the control renders empty with no
+    // error anywhere, which is exactly how the light/dark theme pickers
+    // shipped blank.
+    void testSettingsDropdownsAreAllPopulated()
+    {
+        App app;
+        QVERIFY(app.load());
+        QObject *panel = app.window->findChild<QObject *>(QStringLiteral("settingsPanel"));
+        QVERIFY(panel);
+        QVERIFY(QMetaObject::invokeMethod(panel, "openPanel"));
+
+        for (const char *list : {"themeOptions", "lightThemeOptions", "darkThemeOptions",
+                                 "iconThemeOptions", "fontOptions"}) {
+            const QVariantList values = panel->property(list).toList();
+            QVERIFY2(!values.isEmpty(), list);
+        }
+
+        // And the value each picker starts on has to exist in its own list,
+        // or the control opens on a blank row.
+        for (const auto &[draft, list] : {std::pair{"draftTheme", "themeOptions"},
+                                          std::pair{"draftLightTheme", "lightThemeOptions"},
+                                          std::pair{"draftDarkTheme", "darkThemeOptions"}}) {
+            const QString value = panel->property(draft).toString();
+            QVERIFY2(!value.isEmpty(), draft);
+            QVERIFY2(panel->property(list).toList().contains(value), draft);
+        }
+    }
+
     // Issue #13: menus used a fixed width, so long rows overflowed the popup.
     void testContextMenuWidensForLongLabels()
     {
