@@ -73,14 +73,14 @@ HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
 ### Look & feel
 
 - **TOML themes** with live reload (Catppuccin Mocha by default)
-- **Built-in SVG icon set** (60+ Lucide-style icons rendered via Qt Shapes)
+- **Built-in SVG icon set** (90+ Lucide-style icons rendered via Qt Shapes)
 - **Configurable corner radius**, fonts, animation duration
 - **Wayland compositor blur** on Hyprland plus native KWin blur on KDE Plasma
 
 ### Integrations
 
 - **udisks2** mount/unmount of removable drives
-- **gvfs / gio** for SFTP, SMB, MTP, trash, etc.
+- **gvfs / gio** for SFTP, SMB and MTP (the trash is read directly, no gvfs needed)
 - **Git status overlays** in file lists (modified, staged, untracked, …)
 - **wl-clipboard** for system clipboard
 - **bat** for syntax-highlighted text previews
@@ -126,16 +126,6 @@ If you'd rather install system-wide, drop every `--user` flag and prefix with `s
 Updates arrive via the usual `flatpak update`. The repo is signed with a GPG key committed at [`public-key.asc`](https://github.com/soyeb-jim285/hyprfm-flatpak-repo/blob/main/public-key.asc); Flatpak verifies every download against it automatically.
 
 Each tagged release also attaches an `HyprFM-vX.Y.Z-x86_64.flatpak` bundle to the GitHub release for users who want a single-file install without adding a remote.
-
-### Debian / Ubuntu (.deb)
-
-Grab `hyprfm_*_amd64.deb` from the latest [release](https://github.com/soyeb-jim285/hyprfm/releases) and install:
-
-```bash
-sudo apt install ./hyprfm_*_amd64.deb
-```
-
-Tested on Ubuntu 24.04. May work on other recent Debian-based distributions.
 
 ### AppImage (any distro)
 
@@ -210,8 +200,9 @@ The result lands in the repo root as `HyprFM-<version>-x86_64.AppImage`. The scr
 | | Packages |
 |---|---|
 | **Required (build)** | `cmake`, `ninja`, `qt6-base`, `qt6-declarative`, `qt6-svg` |
-| **Required (runtime)** | `qt6-base`, `qt6-declarative`, `qt6-svg`, `qt6-wayland`, `glib2`, `gvfs` (trash view), `xdg-utils` |
-| **Optional** | `kwindowsystem` / `KF6WindowSystem` (native KDE blur), `wl-clipboard` (clipboard), `fd` (fast search), `bat` (syntax highlighting), `gvfs-smb` (SMB), `gvfs-mtp` (Android/MTP phones), `ffmpeg` (video thumbnails), `udisks2` (device mounting), `poppler` / `poppler-utils` (PDF previews via `pdftoppm`) |
+| **Required (runtime)** | `qt6-base`, `qt6-declarative`, `qt6-svg`, `qt6-wayland`, `glib2`, `xdg-utils` |
+| **Archives** | `tar`, `gzip`, `bzip2`, `xz`, `zstd`, `zip`, `unzip`, `p7zip` (`7z`), `libarchive` (`bsdtar`) — compress/extract shells out to these by name, so a missing one fails only that format |
+| **Optional** | `kwindowsystem` / `KF6WindowSystem` (native KDE blur), `wl-clipboard` (clipboard), `fd` (fast search), `bat` (syntax highlighting), `git` (git status overlays), `gvfs` (SFTP/SMB/MTP — no longer needed for the trash), `gvfs-smb` (SMB), `gvfs-mtp` (Android/MTP phones), `ffmpeg` (video thumbnails), `exiftool` (metadata sidebar), `udisks2` (device mounting), `poppler` / `poppler-utils` (PDF previews via `pdftoppm`) |
 
 ---
 
@@ -224,8 +215,12 @@ The result lands in the repo root as `HyprFM-<version>-x86_64.AppImage`. The scr
 | `Return` / `Double-click` | Open file or directory |
 | `Backspace` / `Alt+Up` | Parent directory |
 | `Alt+Left` / `Alt+Right` | Back / Forward in history |
+| `Alt+Home` | Home directory |
 | `Ctrl+L` | Focus path bar |
 | `Ctrl+F` | Search |
+| `F5` | Refresh |
+| `Ctrl+Return` | Open in a new tab |
+| `Ctrl+Shift+Return` | Open in the split pane |
 | `Type any letter` | Type-ahead jump to file |
 
 ### Views
@@ -241,7 +236,11 @@ The result lands in the repo root as `HyprFM-<version>-x86_64.AppImage`. The scr
 | `F9` | Toggle sidebar |
 | `Ctrl+H` | Toggle hidden files |
 | `Ctrl+Shift+B` | Toggle transparency |
+| `F6` / `Shift+F6` | Focus next / previous pane |
+| `Ctrl+Alt+Left` / `Ctrl+Alt+Right` | Focus left / right pane |
+| `Ctrl+,` | Settings |
 | `Ctrl+Shift+,` | Open `config.toml` in your editor |
+| `Ctrl+?` | Keyboard shortcut reference |
 
 ### Tabs & windows
 
@@ -279,6 +278,9 @@ Run `hyprfm --help` for the full list of flags and environment variables.
 | `Shift+Delete` | Permanent delete |
 | `Ctrl+Shift+N` | New folder |
 | `Ctrl+N` | New file |
+| `Alt+Return` | Properties |
+| `Ctrl+Alt+T` | Open terminal here |
+| `Shift+F10` | Context menu |
 
 Shortcuts can be remapped in `~/.config/hyprfm/config.toml` under the `[shortcuts]` section (see the generated `config.toml.sample` for the full key list). Fixed: `Backspace`, `Alt+1`…`Alt+9`, `Ctrl+PgUp`/`Ctrl+PgDown`, `Ctrl+Scroll`, `Escape`, `Menu`.
 
@@ -410,15 +412,14 @@ HyprFM is a three-layer Qt6 application:
 - **C++ backend** (`src/models/`, `src/services/`, `src/providers/`) — `QAbstractListModel` subclasses for files, tabs, bookmarks, devices. Async services for clipboard, file operations, search, disk usage, previews. Exposed to QML via `setContextProperty`.
 - **System layer** — GIO (`GioTransferWorker`) for transfers, UDisks2 over DBus for devices, `wl-copy` for clipboard.
 
-See [`CLAUDE.md`](CLAUDE.md) for the full architecture notes used by AI coding assistants.
-
 ---
 
 ## 🤝 Contributing
 
 Issues and PRs welcome! A few notes:
 
-- Run tests with `ctest --test-dir build` after changes
+- Tests are off in the build recipe above; configure with `-DBUILD_TESTS=ON` and run `ctest --test-dir build`
+- Pull requests are built and tested automatically by the `Build` workflow
 - Match the existing code style (4-space indent for QML and C++)
 - The project uses Git submodules — `git submodule update --init --recursive` after pulling
 - AppImage builds are produced automatically on `v*` tags by the GitHub Actions workflow
