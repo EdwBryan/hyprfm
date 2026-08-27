@@ -206,6 +206,47 @@ private slots:
         }
     }
 
+    // The Dark Mode switch changes the theme without going through the Theme
+    // dropdown, and Quill's Dropdown breaks its own currentIndex binding the
+    // first time a row is picked. Together that left the field naming one
+    // theme while the app rendered another.
+    void testThemeFieldFollowsTheDarkModeSwitch()
+    {
+        App app;
+        QVERIFY(app.load());
+        QObject *panel = app.window->findChild<QObject *>(QStringLiteral("settingsPanel"));
+        QVERIFY(panel);
+        QVERIFY(QMetaObject::invokeMethod(panel, "openPanel"));
+
+        QObject *dropdown = app.window->findChild<QObject *>(QStringLiteral("themeDropdown"));
+        QVERIFY(dropdown);
+        const QVariantList options = panel->property("themeOptions").toList();
+        QVERIFY(options.size() > 1);
+
+        // Pick a theme that is genuinely not the current one, or setDraftTheme
+        // is a no-op and the test proves nothing.
+        const QString current = panel->property("draftTheme").toString();
+        int otherIndex = -1;
+        for (int i = 0; i < options.size(); ++i) {
+            if (options.at(i).toString() != current) { otherIndex = i; break; }
+        }
+        QVERIFY(otherIndex >= 0);
+        const QString other = options.at(otherIndex).toString();
+
+        // Go through the dropdown's own commit path. Writing currentIndex
+        // from C++ would not do: a QML binding survives that and re-asserts
+        // itself, while the QML-side assignment inside _commit destroys it,
+        // which is the whole point of this test.
+        const int pickIndex = otherIndex == 0 ? 1 : 0;
+        QVERIFY(QMetaObject::invokeMethod(dropdown, "_commit", Q_ARG(QVariant, pickIndex)));
+        QCOMPARE(dropdown->property("currentIndex").toInt(), pickIndex);
+
+        QVERIFY(QMetaObject::invokeMethod(panel, "setDraftTheme", Q_ARG(QVariant, other)));
+
+        QCOMPARE(panel->property("draftTheme").toString(), other);
+        QCOMPARE(dropdown->property("currentIndex").toInt(), otherIndex);
+    }
+
     // Issue #13: menus used a fixed width, so long rows overflowed the popup.
     void testContextMenuWidensForLongLabels()
     {

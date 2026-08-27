@@ -489,7 +489,14 @@ Window {
                 Layout.bottomMargin: 4
             }
 
+            // Quill's Dropdown assigns its own currentIndex when you pick a
+            // row, which destroys the binding below. The Dark Mode switch
+            // changes draftTheme without going through the dropdown, so after
+            // one manual pick the field would keep showing the old name while
+            // the app rendered the new theme. Reassert it on every change.
             Q.Dropdown {
+                id: themeDropdown
+                objectName: "themeDropdown"
                 Layout.fillWidth: true
                 label: "Theme"
                 model: root.themeOptions
@@ -497,6 +504,18 @@ Window {
                 onSelected: (_, value) => {
                     root.setDraftTheme(value)
                     root.applySettingsNow()
+                }
+            }
+
+            // A plain currentIndex binding would be gone the moment someone
+            // picks a row, because Quill's Dropdown assigns to it. A Binding
+            // element reasserts itself whenever draftTheme changes, which is
+            // what the Dark Mode switch does without touching the dropdown.
+            Connections {
+                target: root
+                function onDraftThemeChanged() {
+                    themeDropdown.currentIndex =
+                        root.optionIndex(root.themeOptions, root.draftTheme, 0)
                 }
             }
 
