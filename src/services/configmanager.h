@@ -47,6 +47,10 @@ class ConfigManager : public QObject
     Q_PROPERTY(QString animCurveTransition READ animCurveTransition NOTIFY configChanged)
     Q_PROPERTY(bool showWindowControls READ showWindowControls NOTIFY configChanged)
     Q_PROPERTY(QString windowButtonLayout READ windowButtonLayout NOTIFY configChanged)
+    // The light/dark pair the app falls back to while no explicit theme is set.
+    Q_PROPERTY(QString lightTheme READ lightTheme NOTIFY configChanged)
+    Q_PROPERTY(QString darkTheme READ darkTheme NOTIFY configChanged)
+    Q_PROPERTY(bool followsSystemTheme READ followsSystemTheme NOTIFY configChanged)
     Q_PROPERTY(QString configPath READ configPath CONSTANT)
     // Non-empty when config.toml failed to parse; the last good values stay in effect.
     Q_PROPERTY(QString configError READ configError NOTIFY configErrorChanged)
@@ -64,6 +68,12 @@ public:
     QStringList availableThemes() const;
     QString configPath() const;
     QString theme() const;
+    QString lightTheme() const;
+    QString darkTheme() const;
+    // False once config.toml pins "theme"; the system preference is then ignored.
+    bool followsSystemTheme() const;
+    // Switches to lightTheme()/darkTheme() unless the user pinned a theme.
+    Q_INVOKABLE void applySystemColorScheme(bool dark);
     QString iconTheme() const;
     QString fontFamily() const;
     QString defaultView() const;
@@ -151,6 +161,9 @@ private:
     QDateTime m_configModified;
 
     QString m_theme;
+    QString m_lightTheme;
+    QString m_darkTheme;
+    bool m_themePinned = false;
     QString m_iconTheme;
     QString m_fontFamily;
     QString m_defaultView;

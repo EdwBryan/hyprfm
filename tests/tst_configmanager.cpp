@@ -11,6 +11,49 @@ class TestConfigManager : public QObject
     Q_OBJECT
 
 private slots:
+    void testSystemColorSchemeSwitchesBetweenTheConfiguredPair()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.path() + "/config.toml";
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("[general]\nlight_theme = \"rose-pine-dawn\"\ndark_theme = \"rose-pine\"\n");
+        f.close();
+
+        ConfigManager mgr(path);
+        QVERIFY(mgr.followsSystemTheme());
+        QCOMPARE(mgr.lightTheme(), QString("rose-pine-dawn"));
+        QCOMPARE(mgr.darkTheme(), QString("rose-pine"));
+
+        QSignalSpy spy(&mgr, &ConfigManager::configChanged);
+        mgr.applySystemColorScheme(true);
+        QCOMPARE(mgr.theme(), QString("rose-pine"));
+        mgr.applySystemColorScheme(false);
+        QCOMPARE(mgr.theme(), QString("rose-pine-dawn"));
+        QCOMPARE(spy.count(), 2);
+
+        // Asking for the scheme already in effect must not churn the theme.
+        mgr.applySystemColorScheme(false);
+        QCOMPARE(spy.count(), 2);
+    }
+
+    void testPinnedThemeIgnoresTheSystemColorScheme()
+    {
+        QTemporaryDir dir;
+        const QString path = dir.path() + "/config.toml";
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("[general]\ntheme = \"catppuccin-mocha\"\nlight_theme = \"rose-pine-dawn\"\n");
+        f.close();
+
+        ConfigManager mgr(path);
+        QVERIFY(!mgr.followsSystemTheme());
+
+        // Someone who picked a theme by hand keeps it when the desktop flips.
+        mgr.applySystemColorScheme(false);
+        QCOMPARE(mgr.theme(), QString("catppuccin-mocha"));
+    }
+
     void initTestCase()
     {
         QStandardPaths::setTestModeEnabled(true);

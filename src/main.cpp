@@ -361,15 +361,28 @@ int main(int argc, char *argv[])
     if (themesDir.isEmpty())
         qWarning() << "HyprFM: unable to locate themes directory";
 
-    const QString systemDefaultTheme = app.styleHints()->colorScheme() == Qt::ColorScheme::Light
-        ? QStringLiteral("catppuccin-latte")
-        : QStringLiteral("catppuccin-mocha");
+    const auto systemPrefersDark = [&app]() {
+        return app.styleHints()->colorScheme() == Qt::ColorScheme::Dark;
+    };
+    // Bootstrap value only. Once config.toml has been read, light_theme /
+    // dark_theme decide, so a user pairing their own themes is honoured.
+    const QString systemDefaultTheme = systemPrefersDark()
+        ? QStringLiteral("catppuccin-mocha")
+        : QStringLiteral("catppuccin-latte");
 
     // Create backend instances
     ConfigManager *config = new ConfigManager(configPath, &app, themeDirs, systemDefaultTheme);
     mark("ConfigManager loaded");
     app.setFont(resolveUiFont(config->fontFamily()));
     new UiFontGuard(&app, [&]() { return resolveUiFont(config->fontFamily()); });
+    config->applySystemColorScheme(systemPrefersDark());
+    // Follow the desktop switching between light and dark while we are running,
+    // instead of only sampling it once at launch.
+    QObject::connect(app.styleHints(), &QStyleHints::colorSchemeChanged, config,
+                     [config, systemPrefersDark](Qt::ColorScheme) {
+                         config->applySystemColorScheme(systemPrefersDark());
+                     });
+
     ThemeLoader *theme = new ThemeLoader(&app);
     theme->loadTheme(config->theme(), themeDirs);
     mark("ThemeLoader loaded");
