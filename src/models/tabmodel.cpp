@@ -102,8 +102,14 @@ bool TabModel::sortAscending() const { return m_sortAscending; }
 
 void TabModel::setViewMode(const QString &mode)
 {
-    if (m_viewMode != mode) {
-        m_viewMode = mode;
+    QString normalized = mode;
+    if (normalized == QStringLiteral("list"))
+        normalized = QStringLiteral("detailed");
+    else if (normalized != QStringLiteral("grid") && normalized != QStringLiteral("detailed") && normalized != QStringLiteral("miller"))
+        normalized = QStringLiteral("grid");
+
+    if (m_viewMode != normalized) {
+        m_viewMode = normalized;
         emit viewModeChanged();
     }
 }

@@ -154,15 +154,16 @@ private slots:
         QSignalSpy spy(&tab, &TabModel::viewModeChanged);
 
         tab.setViewMode("list");
-        QCOMPARE(tab.viewMode(), QString("list"));
+        QCOMPARE(tab.viewMode(), QString("detailed"));
         QCOMPARE(spy.count(), 1);
 
         tab.setViewMode("detailed");
         QCOMPARE(tab.viewMode(), QString("detailed"));
-        QCOMPARE(spy.count(), 2);
+        QCOMPARE(spy.count(), 1);
 
         tab.setViewMode("grid");
         QCOMPARE(tab.viewMode(), QString("grid"));
+        QCOMPARE(spy.count(), 2);
     }
 
     void testSortProperties()
