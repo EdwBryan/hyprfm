@@ -47,6 +47,9 @@ class ConfigManager : public QObject
     Q_PROPERTY(QString animCurveTransition READ animCurveTransition NOTIFY configChanged)
     Q_PROPERTY(bool showWindowControls READ showWindowControls NOTIFY configChanged)
     Q_PROPERTY(QString windowButtonLayout READ windowButtonLayout NOTIFY configChanged)
+    // The pair the Dark Mode switch flips between.
+    Q_PROPERTY(QString lightTheme READ lightTheme NOTIFY configChanged)
+    Q_PROPERTY(QString darkTheme READ darkTheme NOTIFY configChanged)
     Q_PROPERTY(QString configPath READ configPath CONSTANT)
     // Non-empty when config.toml failed to parse; the last good values stay in effect.
     Q_PROPERTY(QString configError READ configError NOTIFY configErrorChanged)
@@ -64,6 +67,8 @@ public:
     QStringList availableThemes() const;
     QString configPath() const;
     QString theme() const;
+    QString lightTheme() const;
+    QString darkTheme() const;
     QString iconTheme() const;
     QString fontFamily() const;
     QString defaultView() const;
@@ -151,6 +156,8 @@ private:
     QDateTime m_configModified;
 
     QString m_theme;
+    QString m_lightTheme;
+    QString m_darkTheme;
     QString m_iconTheme;
     QString m_fontFamily;
     QString m_defaultView;

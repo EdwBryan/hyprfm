@@ -216,6 +216,11 @@ Window {
     // Read from the theme's own background rather than its name. The old
     // check treated every theme except catppuccin-latte as dark, so any other
     // light theme showed this toggle stuck on.
+    property string draftLightTheme: ""
+    property string draftDarkTheme: ""
+    property var lightThemeOptions: []
+    property var darkThemeOptions: []
+
     function isDarkTheme(themeName) {
         return (0.2126 * Theme.base.r + 0.7152 * Theme.base.g
                 + 0.0722 * Theme.base.b) < 0.5
@@ -357,6 +362,8 @@ Window {
     function currentSettings() {
         return {
             theme: draftTheme,
+            lightTheme: draftLightTheme,
+            darkTheme: draftDarkTheme,
             fontFamily: draftFontFamily,
             iconTheme: draftIconTheme,
             showHidden: draftShowHidden,
@@ -462,7 +469,7 @@ Window {
                     label: ""
                     checked: root.draftDarkMode
                     onToggled: (value) => {
-                        root.setDraftTheme(value ? "catppuccin-mocha" : "catppuccin-latte")
+                        root.setDraftTheme(value ? root.draftDarkTheme : root.draftLightTheme)
                         root.applySettingsNow()
                     }
                 }
@@ -485,6 +492,38 @@ Window {
                 currentIndex: root.optionIndex(root.themeOptions, root.draftTheme, 0)
                 onSelected: (_, value) => {
                     root.setDraftTheme(value)
+                    root.applySettingsNow()
+                }
+            }
+
+            Text {
+                text: "The Dark Mode switch above flips between these two."
+                color: Theme.subtext
+                font.pointSize: Theme.fontSmall
+                wrapMode: Text.WordWrap
+                Layout.fillWidth: true
+                Layout.topMargin: 8
+                Layout.bottomMargin: 4
+            }
+
+            Q.Dropdown {
+                Layout.fillWidth: true
+                label: "Light theme"
+                model: root.lightThemeOptions
+                currentIndex: root.optionIndex(root.lightThemeOptions, root.draftLightTheme, 0)
+                onSelected: (_, value) => {
+                    root.draftLightTheme = value
+                    root.applySettingsNow()
+                }
+            }
+
+            Q.Dropdown {
+                Layout.fillWidth: true
+                label: "Dark theme"
+                model: root.darkThemeOptions
+                currentIndex: root.optionIndex(root.darkThemeOptions, root.draftDarkTheme, 0)
+                onSelected: (_, value) => {
+                    root.draftDarkTheme = value
                     root.applySettingsNow()
                 }
             }

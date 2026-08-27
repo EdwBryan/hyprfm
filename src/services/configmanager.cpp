@@ -273,6 +273,8 @@ void ConfigManager::setDefaults()
     m_theme = m_defaultThemeName.trimmed().isEmpty()
         ? QStringLiteral("catppuccin-mocha")
         : m_defaultThemeName.trimmed();
+    m_lightTheme = QStringLiteral("catppuccin-latte");
+    m_darkTheme = QStringLiteral("catppuccin-mocha");
     m_iconTheme = "Adwaita";
     m_fontFamily.clear();
     m_defaultView = "grid";
@@ -332,6 +334,10 @@ void ConfigManager::loadConfig()
 
         if (auto v = config["general"]["theme"].value<std::string>())
             m_theme = QString::fromStdString(*v);
+        if (auto v = config["general"]["light_theme"].value<std::string>())
+            m_lightTheme = QString::fromStdString(*v);
+        if (auto v = config["general"]["dark_theme"].value<std::string>())
+            m_darkTheme = QString::fromStdString(*v);
         if (auto v = config["general"]["icon_theme"].value<std::string>())
             m_iconTheme = QString::fromStdString(*v);
         if (auto v = config["general"]["font_family"].value<std::string>())
@@ -556,6 +562,11 @@ QString ConfigManager::documentedConfigTemplate()
 # ~/.config/hyprfm/themes without ".toml". Unset = follow the system
 # light/dark preference (catppuccin-latte / catppuccin-mocha).
 # theme = "catppuccin-mocha"
+
+# The pair the Dark Mode switch in Settings flips between. Point them at any
+# two themes; a script can also just rewrite "theme" above and HyprFM reloads.
+light_theme = "catppuccin-latte"
+dark_theme = "catppuccin-mocha"
 
 # Icon theme for file and folder icons (a directory name under
 # /usr/share/icons or ~/.icons). Toolbar and sidebar icons are built in.
@@ -800,6 +811,8 @@ void ConfigManager::saveListColumns(const QStringList &columns, const QVariantMa
 }
 
 QString ConfigManager::theme() const { return m_theme; }
+QString ConfigManager::lightTheme() const { return m_lightTheme; }
+QString ConfigManager::darkTheme() const { return m_darkTheme; }
 QString ConfigManager::iconTheme() const { return m_iconTheme; }
 QString ConfigManager::fontFamily() const { return m_fontFamily; }
 QString ConfigManager::defaultView() const { return m_defaultView; }
@@ -912,6 +925,17 @@ void ConfigManager::saveSettings(const QVariantMap &settings)
             m_theme = theme;
             general.insert_or_assign("theme", theme.toStdString());
         }
+    }
+
+    for (const auto &[key, tomlKey] : {std::pair{"lightTheme", "light_theme"},
+                                       std::pair{"darkTheme", "dark_theme"}}) {
+        if (!settings.contains(key))
+            continue;
+        const QString value = settings.value(key).toString().trimmed();
+        if (value.isEmpty())
+            continue;
+        (QLatin1String(key) == QLatin1String("lightTheme") ? m_lightTheme : m_darkTheme) = value;
+        general.insert_or_assign(tomlKey, value.toStdString());
     }
 
     if (settings.contains("iconTheme")) {
