@@ -18,6 +18,7 @@ Rectangle {
     property bool searchMode: false
     property bool sidebarVisible: true
     property bool sidebarOnRight: false
+    property string currentViewMode: "grid"
     property bool showWindowControls: false
     property string windowButtonLayout: ":minimize,maximize,close"
     property var window: null
@@ -66,6 +67,7 @@ Rectangle {
     signal upRequested()
     signal navigateRequested(string targetPath)
     signal splitViewToggled()
+    signal viewModeRequested(string mode)
     signal typeFilterChanged(string filter)
     signal dateFilterChanged(string filter)
     signal sizeFilterChanged(string filter)
@@ -257,6 +259,72 @@ Rectangle {
                     onLoaded: {
                         root.syncSearchBarState()
                         item.focusInput()
+                    }
+                }
+
+                // View switcher: one linked group in the Nautilus manner, not
+                // three loose buttons. Same three modes as Ctrl+1/2/3 and the
+                // right-click menu, which were the only ways in until now.
+                Rectangle {
+                    id: viewSwitcher
+                    readonly property int segment: Theme.controlSize - 4
+
+                    visible: !root.searchMode
+                    Layout.preferredWidth: visible ? viewModeRow.width + 4 : 0
+                    Layout.preferredHeight: Theme.controlSize
+                    Layout.alignment: Qt.AlignVCenter
+                    radius: Theme.radiusSmall
+                    color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.06)
+                    border.width: 1
+                    border.color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.10)
+                    Accessible.role: Accessible.Grouping
+                    Accessible.name: "View mode"
+
+                    Row {
+                        id: viewModeRow
+                        anchors.centerIn: parent
+                        spacing: 0
+
+                        Repeater {
+                            model: [
+                                { mode: "grid",     icon: "Grid",         name: "Grid view" },
+                                { mode: "miller",   icon: "Columns",      name: "Miller column view" },
+                                { mode: "detailed", icon: "AlignJustify", name: "Detailed view" }
+                            ]
+
+                            delegate: HoverRect {
+                                id: viewButton
+                                required property var modelData
+                                objectName: "viewModeButton_" + modelData.mode
+                                readonly property bool current: root.currentViewMode === modelData.mode
+
+                                width: viewSwitcher.segment
+                                height: viewSwitcher.segment
+                                Accessible.role: Accessible.RadioButton
+                                Accessible.name: modelData.name
+                                Accessible.checked: current
+
+                                // Only the selected segment is painted; the
+                                // group's own border draws the outline, so the
+                                // segments carry none of their own.
+                                color: current
+                                    ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b,
+                                              hovered ? 0.34 : 0.26)
+                                    : (hovered
+                                        ? Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.1)
+                                        : "transparent")
+                                onClicked: root.viewModeRequested(modelData.mode)
+
+                                Loader {
+                                    anchors.centerIn: parent
+                                    source: "../icons/Icon" + viewButton.modelData.icon + ".qml"
+                                    onLoaded: {
+                                        item.size = 16
+                                        item.color = Qt.binding(() => viewButton.current ? Theme.accent : Theme.text)
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
 

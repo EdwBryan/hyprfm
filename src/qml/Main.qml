@@ -3520,6 +3520,10 @@ ApplicationWindow {
                 searchDateFilter: root.searchProxyForPane(activePane).dateFilter
                 searchSizeFilter: root.searchProxyForPane(activePane).sizeFilter
                 filterPanelOpen: root.paneFilterPanelOpen(activePane)
+                currentViewMode: tabModel.activeTab ? tabModel.activeTab.viewMode : "grid"
+                onViewModeRequested: (mode) => {
+                    if (tabModel.activeTab) tabModel.activeTab.viewMode = mode
+                }
                 onSidebarToggleRequested: root.sidebarVisible = !root.sidebarVisible
                 onBackRequested: root.goActivePaneBack()
                 onForwardRequested: root.goActivePaneForward()

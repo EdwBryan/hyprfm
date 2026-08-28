@@ -397,6 +397,41 @@ private slots:
         QCOMPARE(slider("iconSizeMiller")->property("value").toInt(), 24);
     }
 
+    // Switching view used to be reachable only through Ctrl+1/2/3 or the
+    // right-click menu. The toolbar now carries the three modes, and the
+    // active one is marked.
+    void testToolbarViewSwitcherChangesTheViewMode()
+    {
+        App app;
+        QVERIFY(app.load());
+        QVERIFY(app.tabModel->activeTab());
+        QCOMPARE(app.tabModel->activeTab()->viewMode(), QString("grid"));
+
+        auto button = [&](const char *mode) {
+            return app.item(QStringLiteral("viewModeButton_") + QLatin1String(mode));
+        };
+        QQuickItem *grid = button("grid");
+        QQuickItem *miller = button("miller");
+        QQuickItem *detailed = button("detailed");
+        QVERIFY(grid && miller && detailed);
+        QVERIFY(grid->property("current").toBool());
+        QVERIFY(!miller->property("current").toBool());
+
+        QTest::mouseClick(app.window, Qt::LeftButton, {}, app.center(miller));
+        QTRY_COMPARE(app.tabModel->activeTab()->viewMode(), QString("miller"));
+        QTRY_VERIFY(miller->property("current").toBool());
+        QVERIFY(!grid->property("current").toBool());
+
+        QTest::mouseClick(app.window, Qt::LeftButton, {}, app.center(detailed));
+        QTRY_COMPARE(app.tabModel->activeTab()->viewMode(), QString("detailed"));
+
+        // The Ctrl+1/2/3 shortcuts still drive the same state, so the toolbar
+        // has to follow them too.
+        QTest::keyClick(app.window, Qt::Key_1, Qt::ControlModifier);
+        QTRY_COMPARE(app.tabModel->activeTab()->viewMode(), QString("grid"));
+        QTRY_VERIFY(grid->property("current").toBool());
+    }
+
     // The status bar reports free space as a Dolphin-style meter: the bar
     // fills with what is used and the label sits on it. The fill has to track
     // the ratio and step through accent/warning/error at 75% and 90%, since a
