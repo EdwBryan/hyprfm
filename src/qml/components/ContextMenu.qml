@@ -711,7 +711,7 @@ Item {
             items.push({ text: "View", shortcut: "", action: "view_toggle", isSubmenu: true, icon: "Eye",
                 submenuItems: [
                     { text: "Grid", shortcut: "Ctrl+1", action: "view_grid", checked: currentViewMode === "grid", icon: "Grid" },
-                    { text: "Miller", shortcut: "Ctrl+2", action: "view_miller", checked: currentViewMode === "miller", icon: "Columns" },
+                    { text: "Miller", shortcut: "Ctrl+2", action: "view_miller", checked: currentViewMode === "miller", icon: "Columns3" },
                     { text: "Detailed", shortcut: "Ctrl+3", action: "view_detailed", checked: currentViewMode === "detailed", icon: "AlignJustify" }
                 ]
             })

@@ -288,7 +288,7 @@ Rectangle {
                         Repeater {
                             model: [
                                 { mode: "grid",     icon: "Grid",         name: "Grid view" },
-                                { mode: "miller",   icon: "Columns",      name: "Miller column view" },
+                                { mode: "miller",   icon: "Columns3",     name: "Miller column view" },
                                 { mode: "detailed", icon: "AlignJustify", name: "Detailed view" }
                             ]
 
