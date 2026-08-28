@@ -719,6 +719,69 @@ Window {
             }
 
             Text {
+                text: "Icon Size"
+                color: Theme.accent
+                font.pointSize: Theme.fontSmall
+                font.bold: true
+                Layout.topMargin: 12
+                Layout.bottomMargin: 4
+            }
+
+            Text {
+                text: "Ctrl + scroll wheel does the same inside any view."
+                color: Theme.subtext
+                font.pointSize: Theme.fontSmall
+                Layout.fillWidth: true
+                Layout.bottomMargin: 4
+                wrapMode: Text.WordWrap
+            }
+
+            // Zoom lives in session.json, not config.toml, so these read and
+            // write sessionState directly — no draft value, no
+            // applySettingsNow(). Quill's Slider assigns its own `value` while
+            // dragging, which breaks the binding, but each section lives in a
+            // Loader that is rebuilt every time it is shown, so reopening the
+            // page picks up a Ctrl+wheel made in the meantime.
+            //
+            // The grid zooms by column count, where fewer columns means bigger
+            // icons. The slider is flipped so dragging right always enlarges,
+            // hence `gridSpan - columns` in both directions.
+            Q.Slider {
+                objectName: "iconSizeGrid"
+                readonly property int gridSpan: 14   // minColumns 2 + maxColumns 12
+
+                Layout.fillWidth: true
+                label: "Grid view"
+                from: 2
+                to: 12
+                stepSize: 1
+                value: gridSpan - (sessionState.gridColumns > 0 ? sessionState.gridColumns : 7)
+                onMoved: (value) => sessionState.gridColumns = gridSpan - Math.round(value)
+            }
+
+            Q.Slider {
+                objectName: "iconSizeDetailed"
+                Layout.fillWidth: true
+                label: "Detailed view"
+                from: 22
+                to: 56
+                stepSize: 1
+                value: sessionState.rowHeightDetailed > 0 ? sessionState.rowHeightDetailed : 28
+                onMoved: (value) => sessionState.rowHeightDetailed = Math.round(value)
+            }
+
+            Q.Slider {
+                objectName: "iconSizeMiller"
+                Layout.fillWidth: true
+                label: "Miller view"
+                from: 22
+                to: 56
+                stepSize: 1
+                value: sessionState.rowHeightMiller > 0 ? sessionState.rowHeightMiller : 28
+                onMoved: (value) => sessionState.rowHeightMiller = Math.round(value)
+            }
+
+            Text {
                 text: "Quick Access"
                 color: Theme.accent
                 font.pointSize: Theme.fontSmall

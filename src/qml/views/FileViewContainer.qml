@@ -23,7 +23,9 @@ Item {
     onRowHeightDetailedChanged: if (root.zoomRestored) sessionState.rowHeightDetailed = root.rowHeightDetailed
     onRowHeightMillerChanged: if (root.zoomRestored) sessionState.rowHeightMiller = root.rowHeightMiller
 
-    Component.onCompleted: {
+    // Push sessionState into the views, clamped to what each one accepts.
+    // Values of 0 mean "nothing saved", so the view keeps its own default.
+    function applyZoomFromSession() {
         if (sessionState.gridColumns > 0)
             gridView.columnCount = Math.max(gridView.minColumns,
                 Math.min(gridView.maxColumns, sessionState.gridColumns))
@@ -33,6 +35,24 @@ Item {
         if (sessionState.rowHeightMiller > 0)
             millerView.rowHeight = Math.max(millerView.minRowHeight,
                 Math.min(millerView.maxRowHeight, sessionState.rowHeightMiller))
+    }
+
+    // The settings panel writes the icon size straight into sessionState, so
+    // after the initial restore the views follow it as well as feed it. This
+    // cannot ping-pong with the mirrors above: assigning a value a view
+    // already holds emits nothing, and the clamp is idempotent. It also keeps
+    // both split panes at the same zoom, which is what the single saved value
+    // always meant anyway.
+    Connections {
+        target: sessionState
+        enabled: root.zoomRestored
+        function onGridColumnsChanged() { root.applyZoomFromSession() }
+        function onRowHeightDetailedChanged() { root.applyZoomFromSession() }
+        function onRowHeightMillerChanged() { root.applyZoomFromSession() }
+    }
+
+    Component.onCompleted: {
+        applyZoomFromSession()
         root.zoomRestored = true
         // The views clamp what they accept, so push back what they actually
         // took. Without this an out-of-range or negative value in session.json

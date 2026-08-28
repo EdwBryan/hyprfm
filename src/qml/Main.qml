@@ -3625,6 +3625,7 @@ ApplicationWindow {
 
                             FileViewContainer {
                                 id: primaryFileViewContainer
+                                objectName: "primaryFileView"
                                 Layout.fillWidth: true
                                 Layout.fillHeight: true
                                 fileModel: root.paneModel("primary")

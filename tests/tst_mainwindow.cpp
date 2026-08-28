@@ -48,6 +48,7 @@ class TestMainWindow : public QObject
         QQmlApplicationEngine engine;
         QObject owner;   // parents everything so teardown order is sane
         TabListModel *tabModel = nullptr;
+        SessionState *sessionState = nullptr;
         BookmarkModel *bookmarks = nullptr;
         QQuickWindow *window = nullptr;
 
@@ -100,7 +101,7 @@ class TestMainWindow : public QObject
             auto *recentFiles = new RecentFilesModel(configDir + "/recents.json", &owner);
             auto *devices = new DeviceModel(&owner, true);
             auto *dependencies = new DependencyChecker(&owner);
-            auto *sessionState = new SessionState(&owner);
+            sessionState = new SessionState(&owner);
             auto *iconProvider = new IconProvider(config->iconTheme());
             engine.addImageProvider("thumbnail", new ThumbnailProvider);
             engine.addImageProvider("icon", iconProvider);
@@ -320,6 +321,80 @@ private slots:
         QTRY_COMPARE(sidebar->property("renamingBookmarkIndex").toInt(), -1);
         QCOMPARE(app.bookmarks->data(app.bookmarks->index(0), BookmarkModel::NameRole).toString(),
                  QString("Work"));
+    }
+
+    // Settings > Layout > Icon Size writes straight into sessionState, so the
+    // views have to follow it live. Before this they only read it once at
+    // startup and the sliders moved nothing.
+    void testIconSizeFromSessionStateReachesTheViews()
+    {
+        App app;
+        QVERIFY(app.load());
+        QQuickItem *container = app.item("primaryFileView");
+        QVERIFY(container);
+        auto subView = [&](const char *alias) {
+            return qvariant_cast<QQuickItem *>(container->property(alias));
+        };
+        QQuickItem *grid = subView("gridViewItem");
+        QQuickItem *detailed = subView("detailedViewItem");
+        QQuickItem *miller = subView("millerViewItem");
+        QVERIFY(grid && detailed && miller);
+
+        app.sessionState->setGridColumns(4);
+        app.sessionState->setRowHeightDetailed(40);
+        app.sessionState->setRowHeightMiller(48);
+
+        QTRY_COMPARE(grid->property("columnCount").toInt(), 4);
+        QTRY_COMPARE(detailed->property("rowHeight").toInt(), 40);
+        QTRY_COMPARE(miller->property("rowHeight").toInt(), 48);
+
+        // A view clamps what it accepts and the mirror writes the clamped
+        // value back, so session.json never keeps something unusable.
+        app.sessionState->setGridColumns(99);
+        QTRY_COMPARE(grid->property("columnCount").toInt(), 12);
+        QTRY_COMPARE(app.sessionState->gridColumns(), 12);
+    }
+
+    // The Icon Size sliders sit on the Layout page (section 1), which lives in
+    // a Loader. Dragging one has to move the zoom, and coming back to the page
+    // has to show whatever the zoom is now — including a Ctrl+wheel made while
+    // the panel was on another page.
+    void testSettingsIconSizeSlidersReadAndWriteTheZoom()
+    {
+        App app;
+        QVERIFY(app.load());
+        QObject *panel = app.window->findChild<QObject *>(QStringLiteral("settingsPanel"));
+        QVERIFY(panel);
+        QVERIFY(QMetaObject::invokeMethod(panel, "openPanel"));
+        QVERIFY(QMetaObject::invokeMethod(panel, "showSection", Q_ARG(QVariant, 1)));
+
+        auto slider = [&](const char *name) {
+            return panel->findChild<QObject *>(QLatin1String(name));
+        };
+        QObject *gridSlider = slider("iconSizeGrid");
+        QVERIFY(gridSlider);
+        QVERIFY(slider("iconSizeDetailed") && slider("iconSizeMiller"));
+
+        // Dragging the grid slider one notch right must enlarge the icons,
+        // which means one column fewer.
+        const int columnsBefore = app.sessionState->gridColumns();
+        QVERIFY(QMetaObject::invokeMethod(gridSlider, "moved",
+                                          Q_ARG(qreal, gridSlider->property("value").toReal() + 1)));
+        QCOMPARE(app.sessionState->gridColumns(), columnsBefore - 1);
+
+        // Zoom changed elsewhere shows up when the page is next shown.
+        app.sessionState->setGridColumns(3);
+        app.sessionState->setRowHeightDetailed(50);
+        app.sessionState->setRowHeightMiller(24);
+        QVERIFY(QMetaObject::invokeMethod(panel, "showSection", Q_ARG(QVariant, 0)));
+        QVERIFY(QMetaObject::invokeMethod(panel, "showSection", Q_ARG(QVariant, 1)));
+
+        QObject *reloadedGrid = slider("iconSizeGrid");
+        QVERIFY(reloadedGrid);
+        QCOMPARE(reloadedGrid->property("value").toInt(),
+                 reloadedGrid->property("gridSpan").toInt() - 3);
+        QCOMPARE(slider("iconSizeDetailed")->property("value").toInt(), 50);
+        QCOMPARE(slider("iconSizeMiller")->property("value").toInt(), 24);
     }
 };
 

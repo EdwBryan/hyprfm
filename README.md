@@ -266,7 +266,7 @@ The result lands in the repo root as `HyprFM-<version>-x86_64.AppImage`. The scr
 | `Ctrl+1` | Grid view |
 | `Ctrl+2` | Miller column view |
 | `Ctrl+3` | Detailed view |
-| `Ctrl+Scroll` | Zoom (icon size or row height) |
+| `Ctrl+Scroll` | Zoom (icon size or row height); also Settings → Layout → Icon Size |
 | `Space` | Quick preview |
 | `F3` | Toggle split pane |
 | `F9` | Toggle sidebar |
