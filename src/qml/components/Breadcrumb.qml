@@ -120,12 +120,15 @@ Item {
         anchors.fill: parent
         visible: !root.editMode
         z: -1
-        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        acceptedButtons: config.rightClickToEditPath ? Qt.LeftButton | Qt.RightButton : Qt.LeftButton
         onPressed: (event) => {
             if (event.button === Qt.RightButton && config.rightClickToEditPath)
                 root.startEditing()
         }
-        onDoubleClicked: root.startEditing()
+        onDoubleClicked: (mouse) => {
+            if (mouse.button === Qt.LeftButton)
+                root.startEditing()
+        }
     }
 
     // Clickable path segments (display mode)
