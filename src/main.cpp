@@ -50,6 +50,7 @@
 #include "services/runtimefeaturesservice.h"
 #include "services/dependencychecker.h"
 #include "services/gitstatusservice.h"
+#include "services/sessionstate.h"
 #include "providers/thumbnailprovider.h"
 #include "providers/iconprovider.h"
 #include "providers/pdfpreviewprovider.h"
@@ -436,6 +437,12 @@ int main(int argc, char *argv[])
         tabModel->restoreSession(sessionData.value("tabs").toArray(),
                                  sessionData.value("activeTab").toInt(0));
 
+    // Session-scoped view state (zoom per view). 0 keeps built-in defaults.
+    SessionState *sessionState = new SessionState(&app);
+    sessionState->setGridColumns(sessionData.value("gridColumns").toInt());
+    sessionState->setRowHeightDetailed(sessionData.value("rowHeightDetailed").toInt());
+    sessionState->setRowHeightMiller(sessionData.value("rowHeightMiller").toInt());
+
     // A secondary window has no session to restore, so point its single tab
     // straight at the requested path instead of opening a second tab later.
     if (!isPrimary && !initialOpenPath.isEmpty()) {
@@ -597,6 +604,7 @@ int main(int argc, char *argv[])
     engine.rootContext()->setContextProperty("remoteAccessService", remoteAccessService);
     engine.rootContext()->setContextProperty("runtimeFeatures", runtimeFeatures);
     engine.rootContext()->setContextProperty("dependencies", dependencies);
+    engine.rootContext()->setContextProperty("sessionState", sessionState);
 
     const QString installedMainQml = dataDir.isEmpty()
         ? QString()
@@ -659,6 +667,9 @@ int main(int argc, char *argv[])
         QJsonObject session;
         session["tabs"] = tabModel->saveSession();
         session["activeTab"] = tabModel->activeIndex();
+        session["gridColumns"] = sessionState->gridColumns();
+        session["rowHeightDetailed"] = sessionState->rowHeightDetailed();
+        session["rowHeightMiller"] = sessionState->rowHeightMiller();
 
         if (auto *win = !engine.rootObjects().isEmpty()
                 ? qobject_cast<QQuickWindow *>(engine.rootObjects().first())
@@ -690,6 +701,10 @@ int main(int argc, char *argv[])
 
     QObject::connect(&sessionSaveTimer, &QTimer::timeout, &app, saveSession);
     QObject::connect(tabModel, &TabListModel::sessionChanged, &app, scheduleSessionSave);
+    // Zoom changes are session state too, so persist them the same way.
+    QObject::connect(sessionState, &SessionState::gridColumnsChanged, &app, scheduleSessionSave);
+    QObject::connect(sessionState, &SessionState::rowHeightDetailedChanged, &app, scheduleSessionSave);
+    QObject::connect(sessionState, &SessionState::rowHeightMillerChanged, &app, scheduleSessionSave);
 
     if (auto *win = qobject_cast<QQuickWindow *>(engine.rootObjects().first())) {
         applyWindowEffects(win);

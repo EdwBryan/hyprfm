@@ -23,6 +23,7 @@ set(HYPRFM_SOURCES
     services/runtimefeaturesservice.cpp
     services/dependencychecker.cpp
     services/gitstatusservice.cpp
+    services/sessionstate.cpp
     services/metadataextractor.cpp
     providers/thumbnailprovider.cpp
     providers/pdfpreviewprovider.cpp

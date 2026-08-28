@@ -9,6 +9,33 @@ Item {
     property var fileModel: null
     property string currentPath: ""
 
+    // Zoom state persisted in session.json. The views own their value; these
+    // mirror it up so the session save always sees the latest, and apply the
+    // remembered value once at startup (0 = none saved, keep the default).
+    // zoomRestored suppresses the mirror while the initial value settles,
+    // otherwise the first default 7/28/28 would overwrite the restored values.
+    property int gridColumns: gridView.columnCount
+    property int rowHeightDetailed: detailedView.rowHeight
+    property int rowHeightMiller: millerView.rowHeight
+    property bool zoomRestored: false
+
+    onGridColumnsChanged: if (root.zoomRestored) sessionState.gridColumns = root.gridColumns
+    onRowHeightDetailedChanged: if (root.zoomRestored) sessionState.rowHeightDetailed = root.rowHeightDetailed
+    onRowHeightMillerChanged: if (root.zoomRestored) sessionState.rowHeightMiller = root.rowHeightMiller
+
+    Component.onCompleted: {
+        if (sessionState.gridColumns > 0)
+            gridView.columnCount = Math.max(gridView.minColumns,
+                Math.min(gridView.maxColumns, sessionState.gridColumns))
+        if (sessionState.rowHeightDetailed > 0)
+            detailedView.rowHeight = Math.max(detailedView.minRowHeight,
+                Math.min(detailedView.maxRowHeight, sessionState.rowHeightDetailed))
+        if (sessionState.rowHeightMiller > 0)
+            millerView.rowHeight = Math.max(millerView.minRowHeight,
+                Math.min(millerView.maxRowHeight, sessionState.rowHeightMiller))
+        root.zoomRestored = true
+    }
+
     signal fileActivated(string filePath, bool isDirectory)
     signal contextMenuRequested(string filePath, bool isDirectory, point position)
     signal selectionChanged()

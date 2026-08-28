@@ -187,6 +187,7 @@ add_executable(tst_mainwindow tst_mainwindow.cpp
     ${CMAKE_SOURCE_DIR}/src/services/runtimefeaturesservice.cpp
     ${CMAKE_SOURCE_DIR}/src/services/dependencychecker.cpp
     ${CMAKE_SOURCE_DIR}/src/services/gitstatusservice.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/sessionstate.cpp
     ${CMAKE_SOURCE_DIR}/src/services/metadataextractor.cpp
     ${CMAKE_SOURCE_DIR}/src/providers/thumbnailprovider.cpp
     ${CMAKE_SOURCE_DIR}/src/providers/pdfpreviewprovider.cpp
