@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Layouts
 import QtQuick.Shapes
 import HyprFM
+import Quill as Quill
 
 Rectangle {
     id: statusBar
@@ -12,6 +13,10 @@ Rectangle {
         else parts.push(itemCount + " items")
         if (folderCount > 0) parts.push(folderCount + " folders")
         if (selectedSize) parts.push(selectedSize)
+        if (diskTotal > 0) {
+            parts.push(Quill.Format.bytes(diskFree) + " free of "
+                       + Quill.Format.bytes(diskTotal))
+        }
         return parts.join(", ")
     }
 
@@ -21,6 +26,10 @@ Rectangle {
     property string selectedSize: ""
     property bool selectedSizePending: false
     property string searchStatus: ""
+    // -1 where the location has no filesystem worth reporting (trash, remote,
+    // recents). Real numbers, not int: a disk is bigger than 2 GiB.
+    property real diskFree: -1
+    property real diskTotal: -1
 
     height: 28
     color: Theme.mantle
@@ -90,6 +99,48 @@ Rectangle {
             color: Theme.accent
             font.pointSize: Theme.fontSmall
             verticalAlignment: Text.AlignVCenter
+        }
+
+        // Disk usage, the way Dolphin shows it: the text sits on the bar
+        // rather than beside it. The fill is deliberately low alpha so the
+        // label stays readable across it in either theme. Wording and the
+        // 75/90% colour steps match the sidebar's device bars.
+        Rectangle {
+            id: diskMeter
+            objectName: "diskMeter"
+            visible: statusBar.diskTotal > 0
+            readonly property real usedFraction: statusBar.diskTotal > 0
+                ? Math.max(0, Math.min(1, 1 - statusBar.diskFree / statusBar.diskTotal))
+                : 0
+            readonly property color fillColor: usedFraction >= 0.90
+                ? Theme.error
+                : usedFraction >= 0.75 ? Theme.warning : Theme.accent
+
+            Layout.preferredWidth: diskLabel.implicitWidth + 20
+            Layout.preferredHeight: 18
+            Layout.alignment: Qt.AlignVCenter
+            radius: Theme.radiusSmall
+            color: Qt.rgba(Theme.text.r, Theme.text.g, Theme.text.b, 0.10)
+            clip: true
+
+            Rectangle {
+                objectName: "diskMeterFill"
+                width: parent.width * diskMeter.usedFraction
+                height: parent.height
+                radius: parent.radius
+                color: Qt.rgba(diskMeter.fillColor.r, diskMeter.fillColor.g,
+                               diskMeter.fillColor.b, 0.30)
+                Behavior on width { NumberAnimation { duration: Theme.animDuration } }
+            }
+
+            Text {
+                id: diskLabel
+                anchors.centerIn: parent
+                text: Quill.Format.bytes(statusBar.diskFree)
+                      + " free of " + Quill.Format.bytes(statusBar.diskTotal)
+                color: Theme.subtext
+                font.pointSize: Theme.fontSmall
+            }
         }
     }
 }

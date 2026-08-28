@@ -848,6 +848,17 @@ ApplicationWindow {
         return paneBaseModel(activePane).folderCount
     }
 
+    // Recents lists files from everywhere, so the pane's own directory says
+    // nothing about them. Everything else, search included, is one directory
+    // and the model reports -1 wherever a disk is meaningless anyway.
+    function activeDiskFree() {
+        return root.paneIsRecents(activePane) ? -1 : paneBaseModel(activePane).diskFree
+    }
+
+    function activeDiskTotal() {
+        return root.paneIsRecents(activePane) ? -1 : paneBaseModel(activePane).diskTotal
+    }
+
     function applyActiveTabSort() {
         if (!tabModel.activeTab)
             return
@@ -3750,6 +3761,7 @@ ApplicationWindow {
                 }
 
                 StatusBar {
+                    objectName: "statusBar"
                     Layout.fillWidth: true
                     itemCount: root.activeItemCount()
                     folderCount: root.activeFolderCount()
@@ -3761,6 +3773,8 @@ ApplicationWindow {
                     selectedCount: root.currentSelectedCount
                     selectedSize: root.currentSelectedSize
                     selectedSizePending: root.currentSelectedSizePending
+                    diskFree: root.activeDiskFree()
+                    diskTotal: root.activeDiskTotal()
                 }
             }
         }

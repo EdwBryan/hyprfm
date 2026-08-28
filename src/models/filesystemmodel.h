@@ -4,6 +4,7 @@
 #include <QFileSystemWatcher>
 #include <QTimer>
 #include <QFileInfo>
+#include <QStorageInfo>
 #include <QFutureWatcher>
 #include <QDir>
 #include <QList>
@@ -21,6 +22,11 @@ class FileSystemModel : public QAbstractListModel
     Q_PROPERTY(bool showHidden READ showHidden WRITE setShowHidden NOTIFY showHiddenChanged)
     Q_PROPERTY(int fileCount READ fileCount NOTIFY countsChanged)
     Q_PROPERTY(int folderCount READ folderCount NOTIFY countsChanged)
+    // Space on the filesystem holding rootPath, or -1 where a filesystem is
+    // not what the listing is. countsChanged is the notify signal because the
+    // listing and the disk figures are refreshed by the same events.
+    Q_PROPERTY(qint64 diskFree READ diskFree NOTIFY countsChanged)
+    Q_PROPERTY(qint64 diskTotal READ diskTotal NOTIFY countsChanged)
 
 public:
     enum Roles {
@@ -92,6 +98,9 @@ public:
 
     void setGitStatusService(GitStatusService *service);
 
+    qint64 diskFree() const;
+    qint64 diskTotal() const;
+
 signals:
     void rootPathChanged();
     void showHiddenChanged();
@@ -155,6 +164,10 @@ private:
     QVariantMap remoteFileProperties(const QString &path) const;
     QVariantMap trashFileProperties(const QString &path) const;
     const QVariantMap *findTrashEntry(const QString &path) const;
+
+    // QStorageInfo for rootPath, or an invalid one where reporting a disk
+    // would mislead.
+    QStorageInfo rootStorage() const;
 
     QString m_rootPath;
     bool m_showHidden = false;

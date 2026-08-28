@@ -1,4 +1,5 @@
 #include <QTest>
+#include <QStorageInfo>
 #include <QSignalSpy>
 #include <QLocale>
 #include <QStandardPaths>
@@ -1278,6 +1279,38 @@ private slots:
         QCOMPARE(model.standardPath("PICTURES"),
                  QStandardPaths::writableLocation(QStandardPaths::PicturesLocation));
         QCOMPARE(model.standardPath("not-a-folder"), QDir::homePath());
+    }
+
+    // The status bar shows "N free of M" for the directory on screen. A
+    // location with no filesystem of its own has to report -1 rather than the
+    // host's disk, which would be a number about something else entirely.
+    void testDiskSpaceReportsTheListedDirectoryOrNothing()
+    {
+        QTemporaryDir dir;
+        QVERIFY(dir.isValid());
+        FileSystemModel model;
+        model.setSynchronousReload(true);
+
+        // No root yet.
+        QCOMPARE(model.diskFree(), -1);
+        QCOMPARE(model.diskTotal(), -1);
+
+        model.setRootPath(dir.path());
+        const qint64 total = model.diskTotal();
+        const qint64 free = model.diskFree();
+        QVERIFY(total > 0);
+        QVERIFY(free >= 0);
+        QVERIFY(free <= total);
+        QCOMPARE(total, QStorageInfo(dir.path()).bytesTotal());
+
+        // Trash and remote roots borrow the host's disk; both must stay quiet.
+        model.setRootPath(QStringLiteral("trash:///"));
+        QCOMPARE(model.diskFree(), -1);
+        QCOMPARE(model.diskTotal(), -1);
+
+        model.setRootPath(QStringLiteral("sftp://example.com/home/user"));
+        QCOMPARE(model.diskFree(), -1);
+        QCOMPARE(model.diskTotal(), -1);
     }
 
 private:

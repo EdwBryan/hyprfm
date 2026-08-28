@@ -396,6 +396,57 @@ private slots:
         QCOMPARE(slider("iconSizeDetailed")->property("value").toInt(), 50);
         QCOMPARE(slider("iconSizeMiller")->property("value").toInt(), 24);
     }
+
+    // The status bar reports free space as a Dolphin-style meter: the bar
+    // fills with what is used and the label sits on it. The fill has to track
+    // the ratio and step through accent/warning/error at 75% and 90%, since a
+    // meter nobody can read at a glance is just a coloured box.
+    void testStatusBarDiskMeterTracksUsage()
+    {
+        App app;
+        QVERIFY(app.load());
+        QQuickItem *statusBar = app.item("statusBar");
+        QVERIFY(statusBar);
+        QQuickItem *meter = App::findItem(statusBar, QStringLiteral("diskMeter"));
+        QQuickItem *fill = App::findItem(statusBar, QStringLiteral("diskMeterFill"));
+        QVERIFY(meter && fill);
+
+        // A real directory is on screen, so the meter is showing something.
+        QVERIFY(meter->isVisible());
+
+        auto show = [&](qint64 total, qint64 free) {
+            statusBar->setProperty("diskTotal", double(total));
+            statusBar->setProperty("diskFree", double(free));
+        };
+        auto tierColour = [&] { return meter->property("fillColor").value<QColor>(); };
+
+        show(1000, 750);
+        QTRY_COMPARE(meter->property("usedFraction").toDouble(), 0.25);
+        QTRY_VERIFY(qAbs(fill->width() - meter->width() * 0.25) < 1.0);
+        const QColor normal = tierColour();
+
+        // Just under and just over each threshold, so the boundaries are the
+        // thing under test rather than three arbitrary values.
+        show(1000, 251);
+        QTRY_COMPARE(tierColour(), normal);
+        show(1000, 250);
+        QTRY_VERIFY(tierColour() != normal);
+        const QColor warning = tierColour();
+
+        show(1000, 101);
+        QTRY_COMPARE(tierColour(), warning);
+        show(1000, 100);
+        QTRY_VERIFY(tierColour() != warning);
+        QVERIFY(tierColour() != normal);
+
+        show(1000, 50);
+        QTRY_VERIFY(qAbs(fill->width() - meter->width() * 0.95) < 1.0);
+
+        // Nothing to report hides the meter rather than drawing an empty bar.
+        statusBar->setProperty("diskTotal", -1.0);
+        statusBar->setProperty("diskFree", -1.0);
+        QTRY_VERIFY(!meter->isVisible());
+    }
 };
 
 QTEST_MAIN(TestMainWindow)

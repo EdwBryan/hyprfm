@@ -832,6 +832,31 @@ bool FileSystemModel::isRemoteRoot() const
     return isRemoteUri(m_rootPath);
 }
 
+QStorageInfo FileSystemModel::rootStorage() const
+{
+    // Trash and remote mounts would report the host's own disk, which says
+    // nothing about the listing in front of the user, so report nothing.
+    if (m_rootPath.isEmpty() || isTrashRoot() || isRemoteRoot())
+        return {};
+    if (!QFileInfo(m_rootPath).isDir())
+        return {};
+    return QStorageInfo(m_rootPath);
+}
+
+// Nothing is cached: this is a statfs(2) behind a getter the status bar reads
+// once per listing change, so there is no staleness to manage either.
+qint64 FileSystemModel::diskFree() const
+{
+    const QStorageInfo storage = rootStorage();
+    return storage.isValid() && storage.isReady() ? storage.bytesAvailable() : -1;
+}
+
+qint64 FileSystemModel::diskTotal() const
+{
+    const QStorageInfo storage = rootStorage();
+    return storage.isValid() && storage.isReady() ? storage.bytesTotal() : -1;
+}
+
 void FileSystemModel::setRootPath(const QString &path)
 {
     const QString normalizedPath = normalizeLocation(path);
