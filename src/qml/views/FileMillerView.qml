@@ -1038,15 +1038,16 @@ FocusScope {
                     onClicked: (mouse) => {
                         if (mouse.button === Qt.RightButton) {
                             var mapped = currentDelegateMa.mapToItem(null, mouse.x, mouse.y)
-                            if (currentDelegate.isSelected) {
-                                root.contextMenuRequested(
-                                    currentDelegate.filePath,
-                                    currentDelegate.isDir,
-                                    Qt.point(mapped.x, mapped.y)
-                                )
-                            } else {
-                                root.contextMenuRequested("", false, Qt.point(mapped.x, mapped.y))
-                            }
+                            // See FileGridView: an unselected row is selected
+                            // first so one right-click reaches the item menu;
+                            // an existing multi-selection stays.
+                            if (!currentDelegate.isSelected)
+                                currentColumn.selectIndex(currentDelegate.index, false, false)
+                            root.contextMenuRequested(
+                                currentDelegate.filePath,
+                                currentDelegate.isDir,
+                                Qt.point(mapped.x, mapped.y)
+                            )
                             return
                         }
                         currentColumn.selectIndex(

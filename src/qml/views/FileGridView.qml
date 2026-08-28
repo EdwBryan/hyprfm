@@ -801,15 +801,18 @@ GridView {
                 root.forceActiveFocus()
                 if (mouse.button === Qt.RightButton) {
                     var mapped = ma.mapToItem(null, mouse.x, mouse.y)
-                    if (delegateItem.isSelected) {
-                        root.contextMenuRequested(
-                            delegateItem.filePath,
-                            delegateItem.isDir,
-                            Qt.point(mapped.x, mapped.y)
-                        )
-                    } else {
-                        root.contextMenuRequested("", false, Qt.point(mapped.x, mapped.y))
-                    }
+                    // Right-clicking outside the selection selects that item
+                    // first, the way every other file manager does, so the
+                    // item menu appears in one action. An existing selection
+                    // the item is part of is left alone, so a multi-selection
+                    // survives and the menu still acts on all of it.
+                    if (!delegateItem.isSelected)
+                        root.selectIndex(delegateItem.index, false, false)
+                    root.contextMenuRequested(
+                        delegateItem.filePath,
+                        delegateItem.isDir,
+                        Qt.point(mapped.x, mapped.y)
+                    )
                     return
                 }
                 root.selectIndex(

@@ -146,6 +146,28 @@ target_link_libraries(tst_millerview PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Q
 add_dependencies(tst_millerview hyprfm)
 add_test(NAME tst_millerview COMMAND tst_millerview)
 
+add_executable(tst_viewcontextmenu tst_viewcontextmenu.cpp viewharness.h
+    ${CMAKE_SOURCE_DIR}/src/services/configmanager.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/themeloader.cpp
+    ${CMAKE_SOURCE_DIR}/src/models/filesystemmodel.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/xdgtrash.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/gitstatusservice.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/previewservice.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/metadataextractor.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/runtimefeaturesservice.cpp
+)
+target_include_directories(tst_viewcontextmenu PRIVATE
+    ${CMAKE_SOURCE_DIR}/src
+    ${CMAKE_SOURCE_DIR}/src/third_party
+)
+target_compile_definitions(tst_viewcontextmenu PRIVATE
+    TEST_SOURCE_DIR="${CMAKE_SOURCE_DIR}"
+    TEST_MODULE_DIR="${CMAKE_BINARY_DIR}/src"
+)
+target_link_libraries(tst_viewcontextmenu PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::Concurrent Qt6::DBus PkgConfig::GIO)
+add_dependencies(tst_viewcontextmenu hyprfm)
+add_test(NAME tst_viewcontextmenu COMMAND tst_viewcontextmenu)
+
 add_executable(tst_toolbar tst_toolbar.cpp viewharness.h
     ${CMAKE_SOURCE_DIR}/src/services/configmanager.cpp
     ${CMAKE_SOURCE_DIR}/src/services/themeloader.cpp
@@ -206,7 +228,7 @@ add_test(NAME tst_mainwindow COMMAND tst_mainwindow)
 
 # The view harnesses assert pixel geometry of a 900x600 window; a tiling
 # compositor would resize a real window, so keep them on the offscreen QPA.
-set_tests_properties(tst_detailedview tst_millerview tst_toolbar tst_mainwindow PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
+set_tests_properties(tst_detailedview tst_millerview tst_viewcontextmenu tst_toolbar tst_mainwindow PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")
 
 add_executable(tst_devicemodel tst_devicemodel.cpp
     ${CMAKE_SOURCE_DIR}/src/models/devicemodel.cpp
