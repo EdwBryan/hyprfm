@@ -106,7 +106,7 @@ HyprFM is a Qt6/QML file manager designed to feel native on Hyprland: lightweigh
 
 ### Look & feel
 
-- **TOML themes** with live reload (Catppuccin Mocha by default)
+- **TOML themes** with live reload — Catppuccin Mocha/Latte and Rose Pine/Moon/Dawn bundled
 - **Built-in SVG icon set** (90+ Lucide-style icons rendered via Qt Shapes)
 - **Configurable corner radius**, fonts, animation duration
 - **Wayland compositor blur** on Hyprland plus native KWin blur on KDE Plasma
@@ -400,9 +400,10 @@ types = ["png"]                     # "*", "dir", extension, or MIME ("image/*")
 
 ## 🎨 Theming
 
-Themes are plain TOML files. Nothing is hardcoded in the binary. The bundled
-Catppuccin themes ship as `/usr/share/hyprfm/themes/*.toml`; copy one as a
-starting point:
+Themes are plain TOML files. Nothing is hardcoded in the binary. Five themes
+ship in `/usr/share/hyprfm/themes/*.toml` — `catppuccin-mocha`,
+`catppuccin-latte`, `rose-pine`, `rose-pine-moon` and `rose-pine-dawn`. Copy one
+as a starting point:
 
 ```sh
 cp /usr/share/hyprfm/themes/catppuccin-mocha.toml ~/.config/hyprfm/themes/mytheme.toml
