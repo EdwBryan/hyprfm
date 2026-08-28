@@ -74,6 +74,7 @@ Window {
     property string draftIconTheme: config.iconTheme
     property bool draftDarkMode: true
     property bool draftShowHidden: currentShowHidden
+    property bool draftRightClickToEditPath: config.rightClickToEditPath
     property bool draftDependencyStartupCheck: config.dependencyStartupCheck
     property bool draftSidebarVisible: currentSidebarVisible
     // Must stay in sync with the quick-access entries in Sidebar.qml.
@@ -301,6 +302,7 @@ Window {
             iconThemeOptions = buildOptions(availableIconThemeValues, draftIconTheme, "Adwaita")
 
             draftShowHidden = currentShowHidden
+            draftRightClickToEditPath = config.rightClickToEditPath
             draftDependencyStartupCheck = config.dependencyStartupCheck
             draftSidebarVisible = currentSidebarVisible
             draftHiddenQuickAccess = config.hiddenQuickAccess
@@ -371,6 +373,7 @@ Window {
             fontFamily: draftFontFamily,
             iconTheme: draftIconTheme,
             showHidden: draftShowHidden,
+            rightClickToEditPath: draftRightClickToEditPath,
             dependencyStartupCheck: draftDependencyStartupCheck,
             sidebarVisible: draftSidebarVisible,
             hiddenQuickAccess: draftHiddenQuickAccess,
@@ -665,6 +668,15 @@ Window {
                 checked: root.draftShowHidden
                 onToggled: (value) => {
                     root.draftShowHidden = value
+                    root.applySettingsNow()
+                }
+            }
+
+            Q.Checkbox {
+                label: "Right click address bar to edit path"
+                checked: root.draftRightClickToEditPath
+                onToggled: (value) => {
+                    root.draftRightClickToEditPath = value
                     root.applySettingsNow()
                 }
             }

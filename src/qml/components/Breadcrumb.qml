@@ -114,11 +114,17 @@ Item {
     height: 28
     clip: false
 
-    // Background MouseArea: double-click empty space enters edit mode
+    // Background MouseArea: right click anywhere on the bar (config-gated) or
+    // double click on empty space enters path edit mode with all text selected.
     MouseArea {
         anchors.fill: parent
         visible: !root.editMode
         z: -1
+        acceptedButtons: Qt.LeftButton | Qt.RightButton
+        onPressed: (event) => {
+            if (event.button === Qt.RightButton && config.rightClickToEditPath)
+                root.startEditing()
+        }
         onDoubleClicked: root.startEditing()
     }
 

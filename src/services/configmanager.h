@@ -20,6 +20,7 @@ class ConfigManager : public QObject
     Q_PROPERTY(QString fontFamily READ fontFamily NOTIFY configChanged)
     Q_PROPERTY(QString defaultView READ defaultView NOTIFY configChanged)
     Q_PROPERTY(bool showHidden READ showHidden NOTIFY configChanged)
+    Q_PROPERTY(bool rightClickToEditPath READ rightClickToEditPath NOTIFY configChanged)
     Q_PROPERTY(bool dependencyStartupCheck READ dependencyStartupCheck NOTIFY configChanged)
     Q_PROPERTY(QString sortBy READ sortBy NOTIFY configChanged)
     Q_PROPERTY(bool sortAscending READ sortAscending NOTIFY configChanged)
@@ -73,6 +74,9 @@ public:
     QString fontFamily() const;
     QString defaultView() const;
     bool showHidden() const;
+    // Right click on the address bar starts path editing (Ctrl+L behaviour).
+    // Clicking a breadcrumb segment still navigates.
+    bool rightClickToEditPath() const;
     bool dependencyStartupCheck() const;
     QString sortBy() const;
     bool sortAscending() const;
@@ -162,6 +166,7 @@ private:
     QString m_fontFamily;
     QString m_defaultView;
     bool m_showHidden;
+    bool m_rightClickToEditPath;
     bool m_dependencyStartupCheck;
     QString m_sortBy;
     bool m_sortAscending;
