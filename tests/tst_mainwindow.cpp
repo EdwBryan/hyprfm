@@ -34,6 +34,7 @@
 #include "services/remoteaccessservice.h"
 #include "services/runtimefeaturesservice.h"
 #include "services/searchservice.h"
+#include "services/sessionstate.h"
 #include "services/themeloader.h"
 #include "services/undomanager.h"
 
@@ -99,6 +100,7 @@ class TestMainWindow : public QObject
             auto *recentFiles = new RecentFilesModel(configDir + "/recents.json", &owner);
             auto *devices = new DeviceModel(&owner, true);
             auto *dependencies = new DependencyChecker(&owner);
+            auto *sessionState = new SessionState(&owner);
             auto *iconProvider = new IconProvider(config->iconTheme());
             engine.addImageProvider("thumbnail", new ThumbnailProvider);
             engine.addImageProvider("icon", iconProvider);
@@ -134,6 +136,7 @@ class TestMainWindow : public QObject
             ctx->setContextProperty("remoteAccessService", remoteAccessService);
             ctx->setContextProperty("runtimeFeatures", runtimeFeatures);
             ctx->setContextProperty("dependencies", dependencies);
+            ctx->setContextProperty("sessionState", sessionState);
 
             engine.load(QUrl::fromLocalFile(QStringLiteral(TEST_SOURCE_DIR "/src/qml/Main.qml")));
             if (engine.rootObjects().isEmpty())
