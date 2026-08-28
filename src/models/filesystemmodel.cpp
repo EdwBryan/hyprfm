@@ -328,7 +328,7 @@ QString fileTypeForEntry(const QString &name, bool isDir, const QString &content
 // already-known content type (e.g. from `gio list -a standard::content-type`
 // for trash entries) and otherwise asks QMimeDatabase. For local files
 // QMimeDatabase content-sniffs ambiguous extensions like .ts.
-enum class PreviewKind { None, Image, Video };
+enum class PreviewKind { None, Image, Video, Pdf };
 
 PreviewKind previewKindForEntry(const QString &localPath, bool isDir,
                                 const QString &contentType = QString())
@@ -349,6 +349,8 @@ PreviewKind previewKindForEntry(const QString &localPath, bool isDir,
         return PreviewKind::Image;
     if (mimeName.startsWith(QLatin1String("video/")))
         return PreviewKind::Video;
+    if (mimeName == QLatin1String("application/pdf"))
+        return PreviewKind::Pdf;
     return PreviewKind::None;
 }
 
@@ -762,6 +764,9 @@ QVariant FileSystemModel::data(const QModelIndex &index, int role) const
     case HasVideoPreviewRole:
         ensurePopulated(entry);
         return entry.hasVideoPreview;
+    case HasPdfPreviewRole:
+        ensurePopulated(entry);
+        return entry.hasPdfPreview;
     case GitStatusRole:
         return m_gitService ? m_gitService->statusForPath(info.absoluteFilePath()) : QString();
     case GitStatusIconRole: {
@@ -801,6 +806,7 @@ QHash<int, QByteArray> FileSystemModel::roleNames() const
         {GitStatusIconRole,    "gitStatusIcon"},
         {HasImagePreviewRole,  "hasImagePreview"},
         {HasVideoPreviewRole,  "hasVideoPreview"},
+        {HasPdfPreviewRole,    "hasPdfPreview"},
         {FileOwnerRole,        "fileOwner"},
         {FileGroupRole,        "fileGroup"},
         {FileCreatedTextRole,  "fileCreatedText"},
@@ -1294,6 +1300,7 @@ void FileSystemModel::ensurePopulated(const Entry &entry) const
     const PreviewKind kind = previewKindForEntry(absPath, isDir);
     entry.hasImagePreview = kind == PreviewKind::Image;
     entry.hasVideoPreview = kind == PreviewKind::Video;
+    entry.hasPdfPreview = kind == PreviewKind::Pdf;
     entry.populated = true;
 }
 

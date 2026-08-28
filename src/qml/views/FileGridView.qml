@@ -52,7 +52,13 @@ GridView {
         Math.min(columnCount, Math.min(maxColumns, Math.max(1, Math.floor(width / minCellWidth))))
     )
     readonly property int labelHeight: 32  // two lines of text below icon
-    readonly property int iconRequestSize: 96 * Screen.devicePixelRatio
+    // Ask for the size the icon is actually drawn at. A fixed 96 was being
+    // stretched to iconSize, which is ~229 at the default seven columns on a
+    // 1080p window and over 900 zoomed all the way in, so every icon looked
+    // soft despite the sources being SVG. Rounded up to 32px buckets so
+    // zooming does not defeat the provider's per-size cache.
+    readonly property int iconRequestSize:
+        Math.max(96, Math.ceil(root.iconSize / 32) * 32) * Screen.devicePixelRatio
     readonly property int thumbnailRequestSize: 256 * Screen.devicePixelRatio
 
     cellWidth: Math.floor(width / effectiveColumnCount)
@@ -569,7 +575,8 @@ GridView {
         }
 
         readonly property bool hasThumbnail: !fileOps.isRemotePath(delegateItem.filePath)
-            && (delegateItem.hasImagePreview || delegateItem.hasVideoPreview)
+            && (delegateItem.hasImagePreview || delegateItem.hasVideoPreview
+                || delegateItem.hasPdfPreview)
 
         Image {
             id: thumbImg
@@ -581,10 +588,13 @@ GridView {
             width: root.iconSize
             height: root.iconSize
             fillMode: Image.PreserveAspectFit
-            source: delegateItem.hasThumbnail
-                ? ("image://thumbnail/" + delegateItem.filePath
-                   + "?mtime=" + new Date(delegateItem.fileModified).getTime())
-                : ""
+            source: !delegateItem.hasThumbnail
+                ? ""
+                : delegateItem.hasPdfPreview
+                    ? ("image://pdfpreview/" + encodeURIComponent(delegateItem.filePath)
+                       + "?page=0")
+                    : ("image://thumbnail/" + delegateItem.filePath
+                       + "?mtime=" + new Date(delegateItem.fileModified).getTime())
             sourceSize: Qt.size(root.thumbnailRequestSize,
                                 root.thumbnailRequestSize)
             asynchronous: true

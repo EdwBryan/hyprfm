@@ -1017,13 +1017,15 @@ FocusScope {
                             anchors.verticalCenter: parent.verticalCenter
 
                             readonly property bool hasThumbnail: !fileOps.isRemotePath(detRow.filePath)
-                                && (detRow.hasImagePreview || detRow.hasVideoPreview)
+                                && (detRow.hasImagePreview || detRow.hasVideoPreview
+                                    || detRow.hasPdfPreview)
 
                             Image {
                                 anchors.fill: parent
                                 visible: !parent.hasThumbnail
                                 source: "image://icon/" + detRow.fileIconName + "?theme=" + config.iconTheme
-                                sourceSize: Qt.size(root.detailIconSize, root.detailIconSize)
+                                sourceSize: Qt.size(root.detailIconSize * Screen.devicePixelRatio,
+                                                    root.detailIconSize * Screen.devicePixelRatio)
                                 asynchronous: true
                             }
 
@@ -1031,10 +1033,13 @@ FocusScope {
                                 anchors.fill: parent
                                 visible: parent.hasThumbnail
                                 fillMode: Image.PreserveAspectFit
-                                source: parent.hasThumbnail
-                                    ? ("image://thumbnail/" + detRow.filePath
-                                       + "?mtime=" + new Date(detRow.fileModified).getTime())
-                                    : ""
+                                source: !parent.hasThumbnail
+                                    ? ""
+                                    : detRow.hasPdfPreview
+                                        ? ("image://pdfpreview/" + encodeURIComponent(detRow.filePath)
+                                           + "?page=0")
+                                        : ("image://thumbnail/" + detRow.filePath
+                                           + "?mtime=" + new Date(detRow.fileModified).getTime())
                                 sourceSize: Qt.size(64 * Screen.devicePixelRatio, 64 * Screen.devicePixelRatio)
                                 asynchronous: true
                             }

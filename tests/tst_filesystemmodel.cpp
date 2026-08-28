@@ -1005,6 +1005,32 @@ private slots:
         QVERIFY(info.isWritable());
     }
 
+    // PDFs get a rendered first page in the grid and detailed views, which
+    // needs the model to report them separately from images and video.
+    void testPdfFilesReportAPdfPreview()
+    {
+        TestDir dir;
+        // %PDF header so QMimeDatabase content-sniffs it as application/pdf.
+        dir.createFile("doc.pdf", "%PDF-1.4\n1 0 obj\n<<>>\nendobj\n");
+        dir.createFile("notes.txt", "plain");
+
+        FileSystemModel model;
+        model.setSynchronousReload(true);
+        model.setRootPath(dir.path());
+
+        bool sawPdf = false, sawTxt = false;
+        for (int i = 0; i < model.rowCount(); ++i) {
+            const QModelIndex idx = model.index(i);
+            const QString name = model.data(idx, FileSystemModel::FileNameRole).toString();
+            const bool pdf = model.data(idx, FileSystemModel::HasPdfPreviewRole).toBool();
+            const bool img = model.data(idx, FileSystemModel::HasImagePreviewRole).toBool();
+            if (name == "doc.pdf") { sawPdf = true; QVERIFY(pdf); QVERIFY(!img); }
+            if (name == "notes.txt") { sawTxt = true; QVERIFY(!pdf); }
+        }
+        QVERIFY(sawPdf);
+        QVERIFY(sawTxt);
+    }
+
     // 15. roleNames()
     void testRoleNames()
     {
@@ -1012,7 +1038,8 @@ private slots:
         model.setSynchronousReload(true);
         auto roles = model.roleNames();
 
-        QCOMPARE(roles.count(), 22);
+        QCOMPARE(roles.count(), 23);
+        QCOMPARE(roles[FileSystemModel::HasPdfPreviewRole],    QByteArray("hasPdfPreview"));
         QCOMPARE(roles[FileSystemModel::FileNameRole],         QByteArray("fileName"));
         QCOMPARE(roles[FileSystemModel::FilePathRole],         QByteArray("filePath"));
         QCOMPARE(roles[FileSystemModel::FileSizeRole],         QByteArray("fileSize"));

@@ -373,7 +373,8 @@ FocusScope {
                             width: root.millerIconSize; height: root.millerIconSize
                             anchors.verticalCenter: parent.verticalCenter
                             source: "image://icon/" + parentDelegate.fileIconName + "?theme=" + config.iconTheme
-                            sourceSize: Qt.size(root.millerIconSize, root.millerIconSize)
+                            sourceSize: Qt.size(root.millerIconSize * Screen.devicePixelRatio,
+                                                root.millerIconSize * Screen.devicePixelRatio)
                             asynchronous: true
                             opacity: parentDelegate.isCurrentDir ? 0.95 : 0.8
                         }
@@ -891,7 +892,8 @@ FocusScope {
                                 anchors.fill: parent
                                 visible: !parent.hasThumbnail
                                 source: "image://icon/" + currentDelegate.fileIconName + "?theme=" + config.iconTheme
-                                sourceSize: Qt.size(root.millerIconSize + 2, root.millerIconSize + 2)
+                                sourceSize: Qt.size((root.millerIconSize + 2) * Screen.devicePixelRatio,
+                                                    (root.millerIconSize + 2) * Screen.devicePixelRatio)
                                 asynchronous: true
                             }
 
@@ -1472,7 +1474,8 @@ FocusScope {
                                     width: 14; height: 14
                                     anchors.verticalCenter: parent.verticalCenter
                                     source: "image://icon/" + fileIconName + "?theme=" + config.iconTheme
-                                    sourceSize: Qt.size(14, 14)
+                                    sourceSize: Qt.size(14 * Screen.devicePixelRatio,
+                                                        14 * Screen.devicePixelRatio)
                                     asynchronous: true
                                 }
 
