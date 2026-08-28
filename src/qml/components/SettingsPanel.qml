@@ -258,6 +258,7 @@ Window {
         draftFontFamily = ""
         draftIconTheme = defaultIconThemeName
         draftShowHidden = false
+        draftRightClickToEditPath = true
         draftDependencyStartupCheck = true
         draftSidebarVisible = true
         draftHiddenQuickAccess = []
