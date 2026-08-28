@@ -128,6 +128,61 @@ modules:
         sha256: feccae9a0576d97609c57e32d3914c5116136eab0df74c2ab74ef397d42c5b10
 
   # ── HyprFM ─────────────────────────────────────────────────────────────
+  # ── poppler-utils ──────────────────────────────────────────────────────
+  # PdfPreviewProvider, PreviewService and MetadataExtractor shell out to
+  # pdftoppm and pdfinfo for PDF thumbnails, the quick-preview panel and PDF
+  # metadata. A host poppler is invisible inside the sandbox and its binaries
+  # are linked against host libraries, so installing poppler-utils on the host
+  # cannot help (issue #18). Build the two utils here instead.
+  #
+  # Everything they do not need is switched off: no Qt/glib/cpp wrappers, no
+  # crypto backends, no curl, no tests. The runtime already provides freetype,
+  # fontconfig and zlib, which are poppler's only hard requirements.
+  #
+  # Not bundled on purpose, having checked what org.kde.Platform already
+  # ships: ffmpeg, ffprobe, tar, gzip, bzip2, xz, zstd, zip, unzip and bsdtar
+  # are all in the runtime. 7z is absent but unused, because extracting and
+  # listing .7z/.rar fall back to bsdtar and nothing creates .7z. git is
+  # reached through flatpak-spawn --host. exiftool is skipped deliberately: it
+  # is a Perl program, so it would drag a whole perl runtime in for camera
+  # EXIF tags alone, and the dependency dialog already explains its absence.
+  - name: poppler
+    buildsystem: cmake-ninja
+    config-opts:
+      - -DCMAKE_BUILD_TYPE=Release
+      - -DENABLE_UTILS=ON
+      - -DENABLE_QT5=OFF
+      - -DENABLE_QT6=OFF
+      - -DENABLE_GLIB=OFF
+      - -DENABLE_CPP=OFF
+      - -DENABLE_LIBCURL=OFF
+      - -DENABLE_NSS3=OFF
+      - -DENABLE_GPGME=OFF
+      - -DENABLE_LIBTIFF=OFF
+      - -DENABLE_BOOST=OFF
+      - -DBUILD_GTK_TESTS=OFF
+      - -DBUILD_QT5_TESTS=OFF
+      - -DBUILD_QT6_TESTS=OFF
+      - -DBUILD_CPP_TESTS=OFF
+      - -DBUILD_MANUAL_TESTS=OFF
+    sources:
+      - type: archive
+        url: https://poppler.freedesktop.org/poppler-26.08.0.tar.xz
+        sha256: dc906e68cea698109706ac6aa3d2c9d4512fcfcac42d90b8afcda486d1b9abd0
+    cleanup:
+      # It builds thirteen utils; hyprfm calls two.
+      - /bin/pdfattach
+      - /bin/pdfdetach
+      - /bin/pdffonts
+      - /bin/pdfimages
+      - /bin/pdfseparate
+      - /bin/pdfsig
+      - /bin/pdftocairo
+      - /bin/pdftohtml
+      - /bin/pdftops
+      - /bin/pdftotext
+      - /bin/pdfunite
+
   - name: hyprfm
     buildsystem: cmake-ninja
     config-opts:
