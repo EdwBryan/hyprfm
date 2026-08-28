@@ -34,6 +34,13 @@ Item {
             millerView.rowHeight = Math.max(millerView.minRowHeight,
                 Math.min(millerView.maxRowHeight, sessionState.rowHeightMiller))
         root.zoomRestored = true
+        // The views clamp what they accept, so push back what they actually
+        // took. Without this an out-of-range or negative value in session.json
+        // is displayed correctly but never corrected on disk, and survives
+        // every restart.
+        sessionState.gridColumns = gridView.columnCount
+        sessionState.rowHeightDetailed = detailedView.rowHeight
+        sessionState.rowHeightMiller = millerView.rowHeight
     }
 
     signal fileActivated(string filePath, bool isDirectory)
