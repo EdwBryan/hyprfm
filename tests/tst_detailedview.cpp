@@ -11,6 +11,7 @@
 #include <QTemporaryDir>
 #include <QDir>
 #include <QFile>
+#include <functional>
 #include "viewharness.h"
 
 class TestDetailedView : public QObject
@@ -20,6 +21,30 @@ class TestDetailedView : public QObject
     using Harness = ViewHarness;
 
 private slots:
+    // A PDF should draw its first page, not the generic mimetype icon. The
+    // delegate reads model roles through `required property`, so referencing
+    // hasPdfPreview without declaring it left it undefined, silently falsy,
+    // and every PDF fell back to the icon with no error anywhere.
+    void testPdfRowsUseThePdfPreviewProvider()
+    {
+        Harness h;
+        h.files.createFile("doc.pdf", "%PDF-1.4\n1 0 obj\n<<>>\nendobj\n");
+        h.files.createFile("notes.txt", "plain");
+        QVERIFY(h.load());
+
+        std::function<bool(QQuickItem *)> hasPdfSource = [&](QQuickItem *it) -> bool {
+            const QVariant src = it->property("source");
+            if (src.isValid()
+                && src.toString().startsWith(QStringLiteral("image://pdfpreview/")))
+                return true;
+            for (QQuickItem *child : it->childItems())
+                if (hasPdfSource(child))
+                    return true;
+            return false;
+        };
+        QTRY_VERIFY(hasPdfSource(h.view.rootObject()));
+    }
+
     void testWheelOverListScrollsAndCtrlWheelPassesThrough()
     {
         Harness h;

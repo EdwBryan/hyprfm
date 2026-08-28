@@ -549,6 +549,7 @@ GridView {
         required property string gitStatusIcon
         required property bool hasImagePreview
         required property bool hasVideoPreview
+        required property bool hasPdfPreview
 
         readonly property bool isSelected: root.selectedIndices.indexOf(index) >= 0
         readonly property bool isCutPending: clipboard.isCut && clipboard.contains(delegateItem.filePath)
