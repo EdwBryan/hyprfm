@@ -1234,6 +1234,13 @@ FocusScope {
             property string previewFilePath: ""
             property bool previewIsDir: false
 
+            // The page we are navigating away from, held on screen until the
+            // incoming one is Ready. An Image drops its texture the moment
+            // source changes, so without this every page turn flashes empty
+            // -- even on a cache hit, which still resolves a frame or two
+            // later because the provider is asynchronous.
+            property string pdfHoldSource: ""
+
             // Rich preview data (like QuickPreview)
             property var fileProps: ({})
             readonly property var textPreview: previewLoader.textPreview
@@ -1364,7 +1371,11 @@ FocusScope {
             function changePdfPage(delta) {
                 if (!isPdf || pdfPreview.pageCount <= 0)
                     return
-                pdfPageIndex = Math.max(0, Math.min(pdfPreview.pageCount - 1, pdfPageIndex + delta))
+                var next = Math.max(0, Math.min(pdfPreview.pageCount - 1, pdfPageIndex + delta))
+                if (next === pdfPageIndex)
+                    return
+                pdfHoldSource = pdfImageSource
+                pdfPageIndex = next
             }
 
             function handlePdfWheel(wheel) {
@@ -1425,6 +1436,7 @@ FocusScope {
             }
 
             onPreviewFilePathChanged: {
+                pdfHoldSource = ""
                 pdfPageIndex = 0
                 pdfWheelAccumulator = 0
                 refreshPreview()
@@ -1559,6 +1571,21 @@ FocusScope {
                         smooth: true
                     }
 
+                    // Outgoing page, drawn underneath while the next one
+                    // loads. Cleared as soon as pdfPreviewImage is Ready.
+                    Image {
+                        id: pdfHoldImage
+                        anchors.fill: parent
+                        anchors.margins: 8
+                        visible: previewColumn.pdfHoldSource !== ""
+                            && pdfPreviewImage.status !== Image.Ready
+                        source: previewColumn.pdfHoldSource
+                        sourceSize: pdfPreviewImage.sourceSize
+                        fillMode: Image.PreserveAspectFit
+                        asynchronous: true
+                        smooth: true
+                    }
+
                     // PDF preview
                     Image {
                         id: pdfPreviewImage
@@ -1573,6 +1600,10 @@ FocusScope {
                         fillMode: Image.PreserveAspectFit
                         asynchronous: true
                         smooth: true
+                        onStatusChanged: {
+                            if (status === Image.Ready || status === Image.Error)
+                                previewColumn.pdfHoldSource = ""
+                        }
                     }
 
                     // Warm the neighbouring pages into Qt's pixmap cache so

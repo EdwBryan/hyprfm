@@ -22,6 +22,13 @@ Item {
     property var fontPreview: ({ family: "", styleName: "", weight: 400, italic: false, valid: false, error: "" })
     property string metadataHint: ""
     property int pdfPageIndex: 0
+
+    // The page we are navigating away from, held on screen until the
+    // incoming one is Ready. An Image drops its texture the moment source
+    // changes, so without this every page turn flashes empty -- even on a
+    // cache hit, which still resolves a frame or two later because the
+    // provider is asynchronous.
+    property string pdfHoldSource: ""
     property real pdfWheelAccumulator: 0
     property bool closing: false
     readonly property bool previewLoading: previewLoader.loading
@@ -253,6 +260,7 @@ Item {
         }
     }
     onFilePathChanged: {
+        pdfHoldSource = ""
         pdfPageIndex = 0
         pdfWheelAccumulator = 0
         refreshPreviewData()
@@ -265,7 +273,11 @@ Item {
     function changePdfPage(delta) {
         if (!isPdf || pdfPreview.pageCount <= 0)
             return
-        pdfPageIndex = Math.max(0, Math.min(pdfPreview.pageCount - 1, pdfPageIndex + delta))
+        var next = Math.max(0, Math.min(pdfPreview.pageCount - 1, pdfPageIndex + delta))
+        if (next === pdfPageIndex)
+            return
+        pdfHoldSource = pdfImageSource
+        pdfPageIndex = next
     }
 
     function handlePdfWheel(wheel) {
@@ -659,6 +671,20 @@ Item {
                             smooth: true
                         }
 
+                        // Outgoing page, drawn underneath while the next one
+                        // loads. Cleared as soon as pdfPreviewImage is Ready.
+                        Image {
+                            id: pdfHoldImage
+                            anchors.fill: parent
+                            visible: root.pdfHoldSource !== ""
+                                && pdfPreviewImage.status !== Image.Ready
+                            source: root.pdfHoldSource
+                            sourceSize: pdfPreviewImage.sourceSize
+                            fillMode: Image.PreserveAspectFit
+                            asynchronous: true
+                            smooth: true
+                        }
+
                         Image {
                             id: pdfPreviewImage
                             anchors.fill: parent
@@ -668,6 +694,10 @@ Item {
                             fillMode: Image.PreserveAspectFit
                             asynchronous: true
                             smooth: true
+                            onStatusChanged: {
+                                if (status === Image.Ready || status === Image.Error)
+                                    root.pdfHoldSource = ""
+                            }
                         }
 
                         // Warm the neighbouring pages into Qt's pixmap cache
