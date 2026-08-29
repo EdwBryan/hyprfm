@@ -14,15 +14,17 @@ Item {
     property var fileModel: fsModel
 
     property var fileProps: ({})
-    property var textPreview: ({ content: "", truncated: false, isBinary: false, error: "" })
-    property var directoryPreview: ({ entries: [], truncated: false, error: "", count: 0 })
-    property var pdfPreview: ({ localPath: "", pageCount: 0, error: "" })
+    readonly property var textPreview: previewLoader.textPreview
+    readonly property var directoryPreview: previewLoader.directoryPreview
+    readonly property var pdfPreview: previewLoader.pdfPreview
+    readonly property var fileMetadata: previewLoader.fileMetadata
+    // Fonts stay local: QFontDatabase is GUI-thread-only.
     property var fontPreview: ({ family: "", styleName: "", weight: 400, italic: false, valid: false, error: "" })
-    property var fileMetadata: ({})
     property string metadataHint: ""
     property int pdfPageIndex: 0
     property real pdfWheelAccumulator: 0
     property bool closing: false
+    readonly property bool previewLoading: previewLoader.loading
 
     signal closed()
     signal openRequested(string path, bool isDirectory)
@@ -87,6 +89,28 @@ Item {
                        "patch", "cmake", "qml", "mk", "desktop"]
         return textExt.indexOf(fileExtension) >= 0
     }
+    // Which loader the worker thread should run. Mirrors the is* properties
+    // below; "" means metadata only (images, video, audio, fonts).
+    readonly property string previewKind: {
+        if (isRemoteUri) return ""
+        if (isDirectory) return "directory"
+        if (isArchive) return "archive"
+        if (isPdf) return "pdf"
+        if (isText) return "text"
+        return ""
+    }
+
+    PreviewLoader {
+        id: previewLoader
+        requester: "quick"
+        path: root.isRemoteUri ? "" : root.filePath
+        kind: root.previewKind
+        onPdfPageCountChanged: {
+            if (root.pdfPageIndex >= (pdfPreview.pageCount || 0))
+                root.pdfPageIndex = 0
+        }
+    }
+
     readonly property bool pdfPreviewAvailable: previewService.pdfPreviewAvailable
     readonly property bool videoPreviewAvailable: runtimeFeatures.ffmpegAvailable
     readonly property bool textHighlightAvailable: runtimeFeatures.batAvailable
@@ -186,52 +210,26 @@ Item {
     }
 
     function refreshPreviewData() {
-        if (!active || filePath === "")
+        if (!active || filePath === "") {
+            previewLoader.stop()
             return
+        }
 
+        // Cheap in-memory model lookup, so the header (name, size, icon)
+        // repaints immediately while the body is still being read.
         if (fileModel && fileModel.fileProperties)
             fileProps = fileModel.fileProperties(filePath)
         else
             fileProps = ({})
 
-        if (isRemoteUri) {
-            textPreview = ({ content: "", truncated: false, isBinary: false, error: "" })
-            pdfPreview = ({ localPath: "", pageCount: 0, error: "" })
-            fontPreview = ({ family: "", styleName: "", weight: 400, italic: false, valid: false, error: "" })
-            directoryPreview = ({ entries: [], truncated: false, error: "", count: 0 })
-            fileMetadata = ({})
-            metadataHint = ""
-            return
-        }
+        metadataHint = isRemoteUri
+            ? "" : metadataExtractor.missingDepsHint(fileProps.mimeType || "")
 
-        if (isText)
-            textPreview = previewService.loadTextPreview(filePath)
-        else
-            textPreview = ({ content: "", truncated: false, isBinary: false, error: "" })
+        fontPreview = (isFont && !isRemoteUri)
+            ? previewService.loadFontPreview(filePath)
+            : ({ family: "", styleName: "", weight: 400, italic: false, valid: false, error: "" })
 
-        if (isPdf) {
-            pdfPreview = previewService.loadPdfPreview(filePath)
-            if (pdfPageIndex >= (pdfPreview.pageCount || 0))
-                pdfPageIndex = 0
-        } else {
-            pdfPreview = ({ localPath: "", pageCount: 0, error: "" })
-        }
-
-        if (isFont)
-            fontPreview = previewService.loadFontPreview(filePath)
-        else
-            fontPreview = ({ family: "", styleName: "", weight: 400, italic: false, valid: false, error: "" })
-
-        if (isDirectory)
-            directoryPreview = previewService.loadDirectoryPreview(filePath)
-        else if (isArchive)
-            directoryPreview = previewService.loadArchivePreview(filePath)
-        else
-            directoryPreview = ({ entries: [], truncated: false, error: "", count: 0 })
-
-        // Extract rich metadata
-        fileMetadata = metadataExtractor.extract(filePath)
-        metadataHint = metadataExtractor.missingDepsHint(fileProps.mimeType || "")
+        previewLoader.reload()
     }
 
     onActiveChanged: {
@@ -246,6 +244,9 @@ Item {
             openAnim.start()
             Qt.callLater(function() { root.forceActiveFocus() })
         } else if (visible) {
+            // Closing: stop any in-flight worker from doing pointless work
+            // and from repainting a panel the user is no longer looking at.
+            previewLoader.stop()
             openAnim.stop()
             closing = true
             closeAnim.start()
@@ -667,6 +668,30 @@ Item {
                             fillMode: Image.PreserveAspectFit
                             asynchronous: true
                             smooth: true
+                        }
+
+                        // Warm the neighbouring pages into Qt's pixmap cache
+                        // so flipping is a cache hit instead of another
+                        // pdftoppm run. sourceSize must match pdfPreviewImage
+                        // exactly -- it is part of the cache key, and a
+                        // mismatch silently renders everything twice.
+                        Repeater {
+                            model: (root.isPdf && root.pdfPreviewAvailable
+                                    && root.pdfPreview.localPath !== ""
+                                    && root.pdfPreview.error === "") ? [1, -1] : []
+                            Image {
+                                visible: false
+                                asynchronous: true
+                                sourceSize: Qt.size(pdfPreviewImage.width, pdfPreviewImage.height)
+                                source: {
+                                    var page = root.pdfPageIndex + modelData
+                                    if (page < 0 || page >= (root.pdfPreview.pageCount || 0))
+                                        return ""
+                                    return "image://pdfpreview/"
+                                        + encodeURIComponent(root.pdfPreview.localPath)
+                                        + "?page=" + page
+                                }
+                            }
                         }
 
                         MouseArea {
