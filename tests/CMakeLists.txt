@@ -72,6 +72,7 @@ add_test(NAME tst_undomanager COMMAND tst_undomanager)
 
 add_executable(tst_previewservice tst_previewservice.cpp
     ${CMAKE_SOURCE_DIR}/src/services/previewservice.cpp
+    ${CMAKE_SOURCE_DIR}/src/services/metadataextractor.cpp
 )
 target_include_directories(tst_previewservice PRIVATE ${CMAKE_SOURCE_DIR}/src)
 target_link_libraries(tst_previewservice PRIVATE Qt6::Test Qt6::Core Qt6::Gui)

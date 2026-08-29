@@ -507,6 +507,7 @@ int main(int argc, char *argv[])
 
     PreviewService *previewService = new PreviewService(&app);
     MetadataExtractor *metadataExtractor = new MetadataExtractor(&app);
+    previewService->setMetadataExtractor(metadataExtractor);
     DiskUsageService *diskUsageService = new DiskUsageService(&app);
     RemoteAccessService *remoteAccessService = new RemoteAccessService(&app);
     RuntimeFeaturesService *runtimeFeatures = new RuntimeFeaturesService(&app);

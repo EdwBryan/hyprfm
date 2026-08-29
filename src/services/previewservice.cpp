@@ -1,5 +1,7 @@
 #include "services/previewservice.h"
 
+#include "services/metadataextractor.h"
+
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
@@ -12,6 +14,7 @@
 #include <QRegularExpression>
 #include <QRawFont>
 #include <QStandardPaths>
+#include <QThreadPool>
 #include <QUrl>
 
 namespace {
@@ -303,7 +306,92 @@ QByteArray batPreview(const QString &path, const QByteArray &data, int maxLines,
 
 PreviewService::PreviewService(QObject *parent)
     : QObject(parent)
+    , m_pool(new QThreadPool(this))
 {
+    // Two threads: one preview is in flight at a time, but a request that
+    // hits loadArchivePreview's 10 s timeout must not delay the next one.
+    m_pool->setMaxThreadCount(2);
+}
+
+PreviewService::~PreviewService()
+{
+    // Workers capture `this`. Drain them before the members they touch die.
+    {
+        QMutexLocker locker(&m_generationMutex);
+        for (auto it = m_generations.begin(); it != m_generations.end(); ++it)
+            ++it.value();
+    }
+    m_pool->waitForDone();
+}
+
+void PreviewService::setMetadataExtractor(MetadataExtractor *extractor)
+{
+    m_metadata = extractor;
+}
+
+quint64 PreviewService::bumpGeneration(const QString &requester)
+{
+    QMutexLocker locker(&m_generationMutex);
+    return ++m_generations[requester];
+}
+
+bool PreviewService::isCurrent(const QString &requester, quint64 generation) const
+{
+    QMutexLocker locker(&m_generationMutex);
+    return m_generations.value(requester) == generation;
+}
+
+void PreviewService::cancelPreview(const QString &requester)
+{
+    bumpGeneration(requester);
+}
+
+void PreviewService::requestPreview(const QString &requester, const QString &path,
+                                    const QString &kind)
+{
+    const quint64 generation = bumpGeneration(requester);
+
+    if (path.isEmpty()) {
+        emit previewReady(requester, path, QVariantMap());
+        return;
+    }
+
+    m_pool->start([this, requester, path, kind, generation]() {
+        const QVariantMap data = buildPreview(path, kind);
+
+        // Cheap early-out so a superseded worker doesn't queue a no-op onto
+        // the GUI thread. The authoritative check is the one inside the
+        // lambda below: the generation can still move while this is queued.
+        if (!isCurrent(requester, generation))
+            return;
+
+        QMetaObject::invokeMethod(this, [this, requester, path, data, generation]() {
+            if (!isCurrent(requester, generation))
+                return;
+            emit previewReady(requester, path, data);
+        }, Qt::QueuedConnection);
+    });
+}
+
+QVariantMap PreviewService::buildPreview(const QString &path, const QString &kind) const
+{
+    QVariantMap data;
+
+    if (kind == QLatin1String("text"))
+        data["text"] = loadTextPreview(path);
+    else if (kind == QLatin1String("pdf"))
+        data["pdf"] = loadPdfPreview(path);
+    else if (kind == QLatin1String("archive"))
+        data["archive"] = loadArchivePreview(path);
+    else if (kind == QLatin1String("directory"))
+        data["directory"] = loadDirectoryPreview(path);
+
+    // exiftool/ffprobe cost ~120 ms each and used to run on the GUI thread
+    // for every image, video, audio and PDF selection.
+    if (m_metadata)
+        data["metadata"] = m_metadata->extract(path);
+
+    return data;
 }
 
 bool PreviewService::pdfPreviewAvailable() const
