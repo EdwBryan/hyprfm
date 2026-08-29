@@ -171,6 +171,35 @@ private slots:
         qunsetenv("TERMINAL"); qunsetenv("EDITOR");
     }
 
+    // Ghostty (and other single-instance terminals) hand a bare launch to the
+    // already-running instance, which ignores our inherited cwd. Known
+    // terminals get an explicit working-directory flag.
+    void testOpenInTerminalPassesDirFlagForKnownTerminal()
+    {
+        QTemporaryDir dir;
+        const QString marker = dir.filePath("argv");
+        const QString term = dir.filePath("ghostty");
+        {
+            QFile f(term);
+            QVERIFY(f.open(QIODevice::WriteOnly));
+            f.write(QStringLiteral("#!/bin/sh\n{ printf '%s ' \"$@\"; echo; pwd; } > \"%1\"\n").arg(marker).toUtf8());
+        }
+        QFile::setPermissions(term, QFile::ReadOwner | QFile::WriteOwner | QFile::ExeOwner);
+        qputenv("TERMINAL", term.toUtf8());
+
+        FileOperations ops;
+        ops.openInTerminal(dir.path());
+        QTRY_VERIFY_WITH_TIMEOUT(QFile::exists(marker), 5000);
+        QFile f(marker);
+        QVERIFY(f.open(QIODevice::ReadOnly));
+        const QStringList lines = QString::fromUtf8(f.readAll()).trimmed().split('\n');
+        QCOMPARE(lines.size(), 2);
+        QCOMPARE(lines[0].trimmed(),
+                 QStringLiteral("--gtk-single-instance=false --working-directory=%1").arg(dir.path()));
+        QCOMPARE(lines[1], dir.path());
+        qunsetenv("TERMINAL");
+    }
+
     void testRunCustomActionSubstitutesPathAndRunsPerItem()
     {
         QTemporaryDir dir;

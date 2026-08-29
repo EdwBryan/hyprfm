@@ -1858,12 +1858,48 @@ void FileOperations::openInTerminal(const QString &dirPath)
         return;
     }
 
-    QString terminal = qEnvironmentVariable("TERMINAL", "kitty");
+    // $TERMINAL may carry flags ("kitty -1"); split like a shell would.
+    QStringList args = QProcess::splitCommand(qEnvironmentVariable("TERMINAL", "kitty"));
+    if (args.isEmpty())
+        args << QStringLiteral("kitty");
+    const QString program = args.takeFirst();
+
+    // Inherited cwd is not enough for single-instance terminals: a bare
+    // "ghostty" hands the launch to the running instance, whose new window
+    // opens in that process's cwd (home). Pass the directory explicitly to
+    // every terminal we know the flag for; unknown ones still get the cwd.
+    const QString exe = QFileInfo(program).fileName();
+    if (exe == QLatin1String("ghostty"))
+        args << QStringLiteral("--gtk-single-instance=false")
+             << QStringLiteral("--working-directory=") + dirPath;
+    else if (exe == QLatin1String("kitty") || exe == QLatin1String("wezterm-gui"))
+        args << QStringLiteral("--directory") << dirPath;
+    else if (exe == QLatin1String("wezterm"))
+        args << QStringLiteral("start") << QStringLiteral("--cwd") << dirPath;
+    else if (exe == QLatin1String("konsole"))
+        args << QStringLiteral("--workdir") << dirPath;
+    else if (exe == QLatin1String("xterm") || exe == QLatin1String("urxvt") || exe == QLatin1String("rxvt"))
+        args << QStringLiteral("-cd") << dirPath;
+    else if (exe == QLatin1String("alacritty") || exe == QLatin1String("foot")
+             || exe == QLatin1String("gnome-terminal") || exe == QLatin1String("kgx")
+             || exe == QLatin1String("ptyxis") || exe == QLatin1String("xfce4-terminal")
+             || exe == QLatin1String("tilix") || exe == QLatin1String("terminator")
+             || exe == QLatin1String("mate-terminal") || exe == QLatin1String("lxterminal")
+             || exe == QLatin1String("deepin-terminal") || exe == QLatin1String("qterminal"))
+        args << QStringLiteral("--working-directory") << dirPath;
+
     auto *proc = new QProcess(this);
     proc->setWorkingDirectory(dirPath);
-    proc->start(terminal, {});
     connect(proc, qOverload<int, QProcess::ExitStatus>(&QProcess::finished),
             proc, &QProcess::deleteLater);
+    connect(proc, &QProcess::errorOccurred, this, [this, proc, program](QProcess::ProcessError e) {
+        if (e != QProcess::FailedToStart)
+            return;
+        emit operationFinished(false,
+            QStringLiteral("Could not run '%1' — set $TERMINAL to your terminal emulator").arg(program));
+        proc->deleteLater();
+    });
+    proc->start(program, args);
 }
 
 // [[context_menu.actions]] from config.toml. The command uses desktop-entry
