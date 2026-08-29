@@ -41,6 +41,9 @@ ApplicationWindow {
     property string transferDestinationPath: ""
     property var transferReservedTargets: ({})
     property bool paneFocusScheduled: false
+    // Archive being unlocked right now; {path, dest}. dest is empty when the
+    // password only feeds the preview (QuickPreview refresh).
+    property var passwordDialogContext: null
     readonly property string unifiedTrashPath: "trash:///"
     readonly property bool isTrashView: fileOps.isTrashPath(panePath(activePane))
     readonly property bool isRemoteView: fileOps.isRemotePath(panePath(activePane))
@@ -1247,6 +1250,12 @@ ApplicationWindow {
     BulkRenameDialog {
         id: bulkRenameDialog
         onRenameApplied: (paths) => root.handleBulkRenameApplied(paths)
+    }
+
+    ArchivePasswordDialog {
+        id: archivePasswordDialog
+        onConfirmed: (password) => root.handleArchivePasswordConfirmed(password)
+        onRejected: root.passwordDialogContext = null
     }
 
     RemoteConnectDialog {
@@ -3325,20 +3334,41 @@ ApplicationWindow {
             var dest = fileOps.newExtractionFolder(filePath)
             if (!dest)
                 return
-            var opId = fileOps.extractArchive(filePath, dest)
-            if (opId < 0)
-                return
-            var onExtracted = function(success, error, id) {
-                if (id !== opId) return
-                fileOps.operationFinished.disconnect(onExtracted)
-                if (success)
-                    root.navigatePaneTo(pane, dest)
-            }
-            fileOps.operationFinished.connect(onExtracted)
+            root.trackArchiveExtraction(pane, filePath, dest, fileOps.archivePassword(filePath))
         } else {
             fileOps.openFile(filePath)
             recentFiles.addRecent(filePath)
         }
+    }
+
+    // Runs an extraction and navigates the pane into the destination folder
+    // once it succeeds (used by Enter-on-archive and by password retries).
+    function trackArchiveExtraction(pane, archivePath, dest, password) {
+        var opId = fileOps.extractArchive(archivePath, dest, password)
+        if (opId < 0)
+            return
+        var onFinished = function(success, error, id) {
+            if (id !== opId) return
+            fileOps.operationFinished.disconnect(onFinished)
+            if (success) {
+                if (pane)
+                    root.navigatePaneTo(pane, dest)
+                else
+                    root.navigateActivePaneTo(dest)
+            }
+        }
+        fileOps.operationFinished.connect(onFinished)
+    }
+
+    function handleArchivePasswordConfirmed(password) {
+        var ctx = root.passwordDialogContext
+        root.passwordDialogContext = null
+        if (!ctx || !ctx.path)
+            return
+        fileOps.cacheArchivePassword(ctx.path, password)
+        if (ctx.dest)
+            root.trackArchiveExtraction(null, ctx.path, ctx.dest, password)
+        quickPreview.reloadAfterUnlock()
     }
 
     function showContextMenuForPane(pane, filePath, isDirectory, position) {
@@ -3826,6 +3856,10 @@ ApplicationWindow {
                 recentFiles.addRecent(path)
             }
         }
+        onUnlockArchiveRequested: (path) => {
+            root.passwordDialogContext = { path: path, dest: "" }
+            archivePasswordDialog.openFor(path)
+        }
         onClosed: {
             quickPreview.active = false
             root.scheduleActivePaneFocus()
@@ -3848,6 +3882,11 @@ ApplicationWindow {
                 propertiesDialog.refreshFolderDiskUsage()
         }
 
+        function onPasswordRequested(archivePath, destination) {
+            root.passwordDialogContext = { path: archivePath, dest: destination }
+            archivePasswordDialog.openFor(archivePath)
+        }
+
         function onOperationFinished(success, error) {
             fsModel.refresh()
             splitFsModel.refresh()
@@ -3856,6 +3895,8 @@ ApplicationWindow {
                 propertiesDialog.props = propertiesDialog.fileModelRef.fileProperties(propertiesDialog.props.path)
                 propertiesDialog.refreshFolderDiskUsage()
             }
+            if (error === "password required")
+                return  // the password dialog handles it
             if (success)
                 toast.show("Operation completed successfully", "success")
             else

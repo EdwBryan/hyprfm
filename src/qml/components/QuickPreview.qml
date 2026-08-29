@@ -35,6 +35,11 @@ Item {
 
     signal closed()
     signal openRequested(string path, bool isDirectory)
+    signal unlockArchiveRequested(string filePath)
+
+    function reloadAfterUnlock() {
+        root.refreshPreviewData()
+    }
 
     readonly property string fileName: {
         if (fileProps.name)
@@ -236,6 +241,10 @@ Item {
             ? previewService.loadFontPreview(filePath)
             : ({ family: "", styleName: "", weight: 400, italic: false, valid: false, error: "" })
 
+        // Assigned, not bound: archivePassword() is a plain invokable with no
+        // NOTIFY, so a binding would never re-evaluate after the user unlocks
+        // the archive. reloadAfterUnlock() routes back through here.
+        previewLoader.password = isArchive ? fileOps.archivePassword(filePath) : ""
         previewLoader.reload()
     }
 
@@ -880,6 +889,32 @@ Item {
                                 color: Theme.error
                                 font.pointSize: Theme.fontNormal
                                 wrapMode: Text.WordWrap
+                            }
+
+                            Rectangle {
+                                Layout.alignment: Qt.AlignHCenter
+                                visible: directoryPreview.requiresPassword === true
+                                implicitWidth: unlockMouse.containsMouse ? 132 : 124
+                                implicitHeight: 32
+                                radius: Theme.radiusMedium
+                                color: unlockMouse.containsMouse
+                                    ? Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.25)
+                                    : Qt.rgba(Theme.accent.r, Theme.accent.g, Theme.accent.b, 0.14)
+                                Behavior on implicitWidth { NumberAnimation { duration: 100 } }
+
+                                Text {
+                                    anchors.centerIn: parent
+                                    text: "Enter password"
+                                    color: Theme.text
+                                    font.pointSize: Theme.fontSmall
+                                }
+
+                                MouseArea {
+                                    id: unlockMouse
+                                    anchors.fill: parent
+                                    hoverEnabled: true
+                                    onClicked: root.unlockArchiveRequested(root.filePath)
+                                }
                             }
 
                             Item {

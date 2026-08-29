@@ -468,7 +468,8 @@ QVariantMap PreviewService::loadDirectoryPreview(const QString &path, int maxEnt
     return result;
 }
 
-QVariantMap PreviewService::loadArchivePreview(const QString &path, int maxEntries) const
+QVariantMap PreviewService::loadArchivePreview(const QString &path, int maxEntries,
+                                               const QString &password) const
 {
     QVariantMap result;
     result["entries"] = QStringList();
@@ -497,9 +498,15 @@ QVariantMap PreviewService::loadArchivePreview(const QString &path, int maxEntri
     } else if (lower.endsWith(".tar")) {
         program = "tar";
         args = {"-tf", path};
-    } else if (lower.endsWith(".7z") || lower.endsWith(".rar")) {
+} else if (lower.endsWith(".7z") || lower.endsWith(".rar")) {
+        // Always pass -p so 7z never waits for interactive input: an archive
+        // without a password ignores it, an encrypted one fails immediately.
+        // The sentinel (kept in sync with fileoperations.cpp) is long enough
+        // that no real password collides with it.
         program = "7z";
-        args = {"l", "-slt", path};
+        const QString pass = password.isEmpty()
+            ? QLatin1String("__hyprfm_placeholder_password__") : password;
+        args = {"l", "-slt", "-p" + pass, path};
     } else {
         result["error"] = "Unsupported archive format";
         return result;
@@ -507,8 +514,21 @@ QVariantMap PreviewService::loadArchivePreview(const QString &path, int maxEntri
 
     QProcess proc;
     proc.start(program, args);
-    if (!proc.waitForFinished(10000) || proc.exitCode() != 0) {
+    if (!proc.waitForFinished(10000)) {
         result["error"] = "Could not list archive contents";
+        return result;
+    }
+
+    if (proc.exitCode() != 0) {
+        const QString errorText = QString::fromUtf8(proc.readAllStandardError());
+        if (errorText.contains(QLatin1String("password"), Qt::CaseInsensitive)
+            || errorText.contains(QLatin1String("passphrase"), Qt::CaseInsensitive)
+            || errorText.contains(QLatin1String("encrypted"), Qt::CaseInsensitive)) {
+            result["requiresPassword"] = true;
+            result["error"] = "This archive is password-protected.";
+        } else {
+            result["error"] = "Could not list archive contents";
+        }
         return result;
     }
 
