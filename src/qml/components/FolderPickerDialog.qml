@@ -26,11 +26,13 @@ Q.Dialog {
 
     signal folderPicked(string path)
 
-    onOpened: {
-        var start = root.startingFolder !== "" ? root.startingFolder : pickerFsModel.homePath()
-        root.navigateTo(start)
-        folderList.forceActiveFocus()
-    }
+onOpened: {
+    var start = root.startingFolder !== "" ? root.startingFolder : pickerFsModel.homePath()
+    if (start.charAt(0) === "~")
+        start = pickerFsModel.homePath() + start.slice(1)
+    root.navigateTo(start)
+    folderList.forceActiveFocus()
+}
 
     function navigateTo(path) {
         folderList.currentIndex = -1
