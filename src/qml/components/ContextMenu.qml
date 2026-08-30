@@ -168,6 +168,10 @@ Item {
 
     function popup(x, y) {
         closeSubmenu(true)
+        closeAnim.stop()
+        // Drop an in-flight open animation: the manual opacity/scale reset
+        // below would otherwise keep being overwritten until it finishes.
+        openAnim.stop()
         _pendingX = x
         _pendingY = y
         _pendingPopup = true
@@ -176,13 +180,33 @@ Item {
         menuContainer.opacity = 0
         menuContainer.scale = 0.88
         root.visible = true
+
+        // Fallback for re-opening while the column is already laid out (e.g.
+        // another right-click elsewhere): if the height does not change,
+        // onHeightChanged below would never fire and the menu would stay
+        // invisible, eating clicks, while items only appear on hover.
+        Qt.callLater(root._showPendingPopup)
+    }
+
+    function _showPendingPopup() {
+        if (!root._pendingPopup) return
+        // Not laid out yet — onHeightChanged below will take over.
+        if (menuColumn.height <= 0) return
+        root._pendingPopup = false
+        root._reposition()
     }
 
     // Once menuColumn has its real height, position and animate
     Connections {
         target: menuColumn
         function onHeightChanged() {
-            if (!root._pendingPopup) return
+            // A re-popup can have the Qt.callLater fallback run first with a
+            // stale (non-zero) height and clear _pendingPopup, then the model's
+            // relayout arrives here. Reposition on any height change while the
+            // open animation is running, not only while a popup is pending, so
+            // the fresh geometry wins over the stale one.
+            if (!root._pendingPopup && !root.openAnim.running)
+                return
             root._pendingPopup = false
             root._reposition()
         }
@@ -208,7 +232,10 @@ Item {
         menuContainer.y = posY
         menuContainer.transformOrigin = (_pendingY === posY) ? Item.TopLeft : Item.BottomLeft
 
-        openAnim.start()
+        // restart(), not start(): if the menu is re-opened while the previous
+        // open animation is still running, start() is a no-op and the menu
+        // stays invisible.
+        openAnim.restart()
     }
 
     function _positionSubmenu() {
@@ -328,6 +355,8 @@ Item {
     }
 
     function close() {
+        _pendingPopup = false
+        openAnim.stop()
         closeSubmenu(true)
         closeAnim.start()
     }
@@ -428,6 +457,7 @@ Item {
     // ── Menu container ────────────────────────────────────────────────────
     Item {
             id: menuContainer
+            objectName: "contextMenuContainer"
             x: 0
             y: 0
             width: menuColumn.width + 12
