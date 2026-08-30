@@ -103,7 +103,7 @@ target_include_directories(tst_filesystemmodel PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/third_party
 )
-target_link_libraries(tst_filesystemmodel PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent)
+target_link_libraries(tst_filesystemmodel PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Svg Qt6::Concurrent)
 add_test(NAME tst_filesystemmodel COMMAND tst_filesystemmodel)
 
 add_executable(tst_detailedview tst_detailedview.cpp viewharness.h
@@ -223,7 +223,7 @@ target_compile_definitions(tst_mainwindow PRIVATE
     HYPRFM_DATA_DIR="${CMAKE_SOURCE_DIR}"
     HYPRFM_VERSION="test"
 )
-target_link_libraries(tst_mainwindow PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::DBus Qt6::Widgets Qt6::Svg Qt6::Network Qt6::Concurrent PkgConfig::GIO)
+target_link_libraries(tst_mainwindow PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Qml Qt6::Quick Qt6::QuickControls2 Qt6::DBus Qt6::Svg Qt6::Network Qt6::Concurrent PkgConfig::GIO)
 add_dependencies(tst_mainwindow hyprfm)
 add_test(NAME tst_mainwindow COMMAND tst_mainwindow)
 
@@ -278,7 +278,7 @@ target_include_directories(tst_searchproxymodel PRIVATE
     ${CMAKE_SOURCE_DIR}/src
     ${CMAKE_SOURCE_DIR}/src/third_party
 )
-target_link_libraries(tst_searchproxymodel PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Widgets Qt6::Svg Qt6::SvgWidgets Qt6::Concurrent)
+target_link_libraries(tst_searchproxymodel PRIVATE Qt6::Test Qt6::Core Qt6::Gui Qt6::Svg Qt6::Concurrent)
 add_test(NAME tst_searchproxymodel COMMAND tst_searchproxymodel)
 
 add_executable(tst_searchservice tst_searchservice.cpp
