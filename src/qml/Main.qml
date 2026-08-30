@@ -1951,6 +1951,13 @@ ApplicationWindow {
         anchors.fill: parent
         visible: false
         z: 1000
+        focus: visible
+        Keys.onPressed: (event) => {
+            if (event.key === Qt.Key_Escape) {
+                propertiesDialog.close()
+                event.accepted = true
+            }
+        }
         Accessible.role: Accessible.Dialog
         Accessible.name: "File properties"
 
@@ -2008,6 +2015,7 @@ ApplicationWindow {
             _metadataHint = fileOps.isRemotePath(path) ? "" : metadataExtractor.missingDepsHint(props.mimeType || "")
 
             visible = true
+            propertiesDialog.forceActiveFocus()
             propsBox.opacity = 0
             propsBox.scale = 0.88
             propsBox.yOffset = -8
@@ -2056,7 +2064,7 @@ ApplicationWindow {
                     easing.type: Theme.animEasingExit; easing.bezierCurve: Theme.animBezierCurve
                 }
             }
-            ScriptAction { script: propertiesDialog.visible = false }
+            ScriptAction { script: { propertiesDialog.visible = false; root.scheduleActivePaneFocus() } }
         }
 
         MouseArea {
