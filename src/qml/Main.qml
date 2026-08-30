@@ -1948,6 +1948,7 @@ ApplicationWindow {
     // ── Properties dialog ──────────────────────────────────────────────────
     Item {
         id: propertiesDialog
+        objectName: "propertiesDialog"
         anchors.fill: parent
         visible: false
         z: 1000
