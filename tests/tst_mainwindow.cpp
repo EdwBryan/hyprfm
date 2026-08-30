@@ -210,6 +210,25 @@ private slots:
         }
     }
 
+    // minimumHeight used to be bound to the live window height, so once the
+    // compositor grew the settings window the minimum grew with it and the
+    // window could never be shrunk back down. (The horizontal direction always
+    // worked because minimumWidth is a fixed dialogWidth.) Growing the window
+    // must leave the minimum untouched.
+    void testSettingsWindowCanShrinkBackAfterGrowing()
+    {
+        App app;
+        QVERIFY(app.load());
+        QObject *panel = app.window->findChild<QObject *>(QStringLiteral("settingsPanel"));
+        QVERIFY(panel);
+        QVERIFY(QMetaObject::invokeMethod(panel, "openPanel"));
+
+        const int minHeight = panel->property("minimumHeight").toInt();
+        QVERIFY(minHeight > 0);
+        panel->setProperty("height", minHeight + 200);
+        QTRY_COMPARE(panel->property("minimumHeight").toInt(), minHeight);
+    }
+
     // The Dark Mode switch changes the theme without going through the Theme
     // dropdown, and Quill's Dropdown breaks its own currentIndex binding the
     // first time a row is picked. Together that left the field naming one
