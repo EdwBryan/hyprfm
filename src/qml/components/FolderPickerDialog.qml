@@ -27,16 +27,19 @@ Q.Dialog {
     signal folderPicked(string path)
 
 onOpened: {
-    var start = root.startingFolder !== "" ? root.startingFolder : pickerFsModel.homePath()
-    if (start.charAt(0) === "~")
-        start = pickerFsModel.homePath() + start.slice(1)
-    root.navigateTo(start)
-    folderList.forceActiveFocus()
-}
+        var start = root.startingFolder !== "" ? root.startingFolder : pickerFsModel.homePath()
+        if (start.charAt(0) === "~")
+            start = pickerFsModel.homePath() + start.slice(1)
+        root.navigateTo(start)
+        folderList.forceActiveFocus()
+    }
 
     function navigateTo(path) {
         folderList.currentIndex = -1
         currentDir = path
+        // The field starts bound to currentDir, but that binding is dropped on
+        // the first manual edit, so every navigation must refresh it in sync.
+        pathField.text = path
         pickerFsModel.setRootPath(path)
     }
 

@@ -701,9 +701,12 @@ Window {
                         root.applySettingsNow()
                         return
                     }
-                    // A bare path means "Custom folder". An empty custom value
-                    // keeps the previous behaviour ("last") until one is typed.
+                    // A bare path means "Custom folder". Apply right away when one is
+                    // already configured; until then an empty value keeps the
+                    // previous behaviour ("last") and the row invites picking.
                     root.draftStartupDir = root.draftStartupDirCustom.trim()
+                    if (root.draftStartupDir !== "")
+                        root.applySettingsNow()
                 }
             }
 

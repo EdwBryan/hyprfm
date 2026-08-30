@@ -346,8 +346,10 @@ void ConfigManager::loadConfig()
             m_fontFamily = QString::fromStdString(*v);
         if (auto v = config["general"]["default_view"].value<std::string>())
             m_defaultView = QString::fromStdString(*v);
-        if (auto v = config["general"]["startup_dir"].value<std::string>())
-            m_startupDir = QString::fromStdString(*v);
+        if (auto v = config["general"]["startup_dir"].value<std::string>()) {
+            const QString value = QString::fromStdString(*v).trimmed();
+            m_startupDir = value.isEmpty() ? QStringLiteral("last") : value;
+        }
         if (auto v = config["general"]["show_hidden"].value<bool>())
             m_showHidden = *v;
         if (auto v = config["general"]["right_click_to_edit_path"].value<bool>())

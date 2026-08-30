@@ -499,6 +499,15 @@ private slots:
         mgr3.saveSettings(QVariantMap{{"startupDir", ""}});
         ConfigManager mgr4(path);
         QCOMPARE(mgr4.startupDir(), QString("last"));
+
+        // A manual edit that leaves the key empty or whitespace also falls
+        // back on load, mirroring saveSettings().
+        QFile f(path);
+        QVERIFY(f.open(QIODevice::WriteOnly | QIODevice::Truncate));
+        f.write("[general]\nstartup_dir = \"\"\n");
+        f.close();
+        ConfigManager mgr5(path);
+        QCOMPARE(mgr5.startupDir(), QString("last"));
     }
 
     void testDependencyStartupCheckOptOut()
