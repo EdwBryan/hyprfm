@@ -295,6 +295,24 @@ private slots:
         QTRY_COMPARE(menu->property("effectiveMenuWidth").toInt(), base);
     }
 
+    // The Properties dialog is a plain Item overlay, not a Popup, so nothing
+    // gave it keyboard focus and Escape fell through to the file view behind
+    // it. Opening it and pressing Escape must close it again (issue #28).
+    void testEscapeClosesThePropertiesDialog()
+    {
+        App app;
+        QVERIFY(app.load());
+        QQuickItem *dialog = app.item("propertiesDialog");
+        QVERIFY(dialog);
+
+        QVERIFY(QMetaObject::invokeMethod(dialog, "showProperties",
+                                          Q_ARG(QVariant, app.home.path())));
+        QTRY_VERIFY(dialog->isVisible());
+
+        QTest::keyClick(app.window, Qt::Key_Escape);
+        QTRY_VERIFY2(!dialog->isVisible(), "Escape left the properties dialog open");
+    }
+
     // Re-opening the menu while it is already visible and laid out must
     // render it again. popup() used to wait on menuColumn.onHeightChanged,
     // which cannot fire when the new menu has the same height, leaving the
