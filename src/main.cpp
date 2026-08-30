@@ -611,13 +611,16 @@ int main(int argc, char *argv[])
         ? QString()
         : QDir(dataDir).filePath(QStringLiteral("HyprFM/qml/Main.qml"));
 
-    // Prefer the installed on-disk module when it exists so deployed bundles
-    // keep working even if Qt's embedded qrc payload is incomplete.
+    // The qrc module is qmlcachegen-compiled, so loading it skips parsing
+    // ~60 QML files on every launch. The installed on-disk copy is only the
+    // fallback for a qrc payload that turns out incomplete (Qt 6.7.3 built
+    // with NO_CACHEGEN dropped SettingsPanel.qml from it in v0.4.14).
     mark("engine.load start");
-    if (!installedMainQml.isEmpty() && QFile::exists(installedMainQml)) {
+    engine.loadFromModule("HyprFM", "Main");
+    if (engine.rootObjects().isEmpty() && !installedMainQml.isEmpty()
+        && QFile::exists(installedMainQml)) {
+        qWarning() << "HyprFM: embedded QML module failed to load, falling back to" << installedMainQml;
         engine.load(QUrl::fromLocalFile(installedMainQml));
-    } else {
-        engine.loadFromModule("HyprFM", "Main");
     }
     mark("engine.load done");
 
