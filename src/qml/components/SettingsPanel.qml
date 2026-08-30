@@ -13,9 +13,13 @@ Window {
     width: dialogWidth
     height: pageContainer.implicitHeight
     minimumWidth: dialogWidth
-    minimumHeight: height
+    minimumHeight: dialogMinHeight
 
     readonly property int dialogWidth: Math.min(920, (transientParent ? transientParent.width : 920) - 32)
+    // A fixed floor (not the live height): the compositor grows the window by
+    // raising its height, so binding the minimum to it would lock the window
+    // to the new size and it could never be shrunk back down.
+    readonly property int dialogMinHeight: 420
     readonly property int dialogRadius: draftRadiusLarge + 6
 
     function syncHyprlandRounding() {
