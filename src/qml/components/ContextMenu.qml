@@ -205,7 +205,7 @@ Item {
             // relayout arrives here. Reposition on any height change while the
             // open animation is running, not only while a popup is pending, so
             // the fresh geometry wins over the stale one.
-            if (!root._pendingPopup && !root.openAnim.running)
+            if (!root._pendingPopup && !openAnim.running)
                 return
             root._pendingPopup = false
             root._reposition()

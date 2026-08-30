@@ -347,6 +347,43 @@ private slots:
                                     .arg(container->property("opacity").toReal())));
     }
 
+    // The late-relayout guard in ContextMenu's onHeightChanged only runs once
+    // _pendingPopup is already cleared, so it stayed unexercised: `&&`
+    // short-circuits while a popup is pending. Growing an open menu takes that
+    // branch, and a scripting error there aborts the handler, leaving the menu
+    // laid out for its old height and hanging off the bottom of the window.
+    void testGrowingAnOpenMenuKeepsItOnScreen()
+    {
+        App app;
+        QVERIFY(app.load());
+        QQuickItem *menu = app.item("contextMenu");
+        QVERIFY(menu);
+        QQuickItem *container = app.item("contextMenuContainer");
+        QVERIFY(container);
+
+        menu->setProperty("customItems", QVariantList{QVariantMap{
+            {"text", "Open"}, {"action", "noop"}}});
+        const int nearBottom = app.window->height() - 80;
+        QVERIFY(QMetaObject::invokeMethod(menu, "popup",
+                                          Q_ARG(QVariant, 20), Q_ARG(QVariant, nearBottom)));
+        QTRY_COMPARE(container->property("opacity").toReal(), 1.0);
+
+        // Same menu, many more rows: the height change must reposition it.
+        QVariantList many;
+        for (int i = 0; i < 10; ++i)
+            many << QVariantMap{{"text", QStringLiteral("Item %1").arg(i)}, {"action", "noop"}};
+        const qreal shortHeight = container->height();
+        menu->setProperty("customItems", many);
+        // Wait for the taller layout first: asserting straight away passes on
+        // the short menu, which still fits, and proves nothing.
+        QTRY_VERIFY(container->height() > shortHeight + 100);
+
+        QTRY_VERIFY2(container->y() + container->height() <= app.window->height(),
+                     qPrintable(QStringLiteral("menu bottom at %1 in a %2px window")
+                                    .arg(container->y() + container->height())
+                                    .arg(app.window->height())));
+    }
+
     void testWheelOverTabStripScrollsTabsInTheFullWindow()
     {
         App app;
