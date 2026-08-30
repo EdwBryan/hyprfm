@@ -169,6 +169,9 @@ Item {
     function popup(x, y) {
         closeSubmenu(true)
         closeAnim.stop()
+        // Drop an in-flight open animation: the manual opacity/scale reset
+        // below would otherwise keep being overwritten until it finishes.
+        openAnim.stop()
         _pendingX = x
         _pendingY = y
         _pendingPopup = true
@@ -197,7 +200,13 @@ Item {
     Connections {
         target: menuColumn
         function onHeightChanged() {
-            if (!root._pendingPopup) return
+            // A re-popup can have the Qt.callLater fallback run first with a
+            // stale (non-zero) height and clear _pendingPopup, then the model's
+            // relayout arrives here. Reposition on any height change while the
+            // open animation is running, not only while a popup is pending, so
+            // the fresh geometry wins over the stale one.
+            if (!root._pendingPopup && !root.openAnim.running)
+                return
             root._pendingPopup = false
             root._reposition()
         }
@@ -347,6 +356,7 @@ Item {
 
     function close() {
         _pendingPopup = false
+        openAnim.stop()
         closeSubmenu(true)
         closeAnim.start()
     }

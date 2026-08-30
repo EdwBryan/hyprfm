@@ -296,10 +296,12 @@ private slots:
         QTRY_VERIFY2(container->property("opacity").toReal() > 0.99,
                      qPrintable(QStringLiteral("first popup opacity %1")
                                     .arg(container->property("opacity").toReal())));
-        // Let the open animation run to completion; a re-popup that lands on
-        // a still-animating menu would animate to visible on its own and the
-        // regression would go undetected.
-        QTest::qWait(500);
+        // Wait for the first open animation to finish; otherwise a re-popup
+        // could become visible on its own through the still-running animation
+        // and mask the regression. Waiting on the final animated values below
+        // is deterministic across environments and theme timings.
+        QTRY_COMPARE(container->property("opacity").toReal(), 1.0);
+        QTRY_COMPARE(container->property("yOffset").toReal(), 0.0);
 
         // Second popup, same (same-height) menu, menu already visible.
         QVERIFY(QMetaObject::invokeMethod(menu, "popup", Q_ARG(QVariant, 60), Q_ARG(QVariant, 60)));
