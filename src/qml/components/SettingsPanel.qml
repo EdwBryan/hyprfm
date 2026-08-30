@@ -664,7 +664,8 @@ Window {
                 Layout.bottomMargin: 4
             }
 
-            Q.Checkbox {
+            Q.Toggle {
+                Layout.fillWidth: true
                 label: "Show hidden files"
                 checked: root.draftShowHidden
                 onToggled: (value) => {
@@ -673,7 +674,8 @@ Window {
                 }
             }
 
-            Q.Checkbox {
+            Q.Toggle {
+                Layout.fillWidth: true
                 label: "Right click address bar to edit path"
                 checked: root.draftRightClickToEditPath
                 onToggled: (value) => {
@@ -879,7 +881,8 @@ Window {
                 }
             }
 
-            Q.Checkbox {
+            Q.Toggle {
+                Layout.fillWidth: true
                 label: "Close button"
                 enabled: root.draftShowWindowControls
                 checked: root._layoutParts.hasClose
@@ -888,7 +891,8 @@ Window {
                 }
             }
 
-            Q.Checkbox {
+            Q.Toggle {
+                Layout.fillWidth: true
                 label: "Minimize button"
                 enabled: root.draftShowWindowControls
                 checked: root._layoutParts.hasMinimize
@@ -897,7 +901,8 @@ Window {
                 }
             }
 
-            Q.Checkbox {
+            Q.Toggle {
+                Layout.fillWidth: true
                 label: "Maximize button"
                 enabled: root.draftShowWindowControls
                 checked: root._layoutParts.hasMaximize
