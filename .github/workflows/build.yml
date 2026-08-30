@@ -210,6 +210,8 @@ jobs:
           echo "=== wayland-graphics-integration-client ==="
           ls AppDir/usr/plugins/wayland-graphics-integration-client/ || true
 
+          scripts/prune-appdir.sh AppDir
+
           OUTPUT="HyprFM-${TAG_NAME}-x86_64.AppImage" \
           ./linuxdeploy-x86_64.AppImage \
             --appdir AppDir \
