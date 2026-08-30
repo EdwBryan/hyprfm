@@ -479,6 +479,28 @@ private slots:
         QCOMPARE(mgr2.windowButtonLayout(), QString("close:minimize"));
     }
 
+    void testSaveStartupDir()
+    {
+        QTemporaryDir dir;
+        QString path = dir.path() + "/config.toml";
+
+        ConfigManager mgr(path);
+        QCOMPARE(mgr.startupDir(), QString("last"));
+
+        mgr.saveSettings(QVariantMap{{"startupDir", "/home/user/Media"}});
+        ConfigManager mgr2(path);
+        QCOMPARE(mgr2.startupDir(), QString("/home/user/Media"));
+
+        mgr2.saveSettings(QVariantMap{{"startupDir", "home"}});
+        ConfigManager mgr3(path);
+        QCOMPARE(mgr3.startupDir(), QString("home"));
+
+        // An empty value falls back to the default.
+        mgr3.saveSettings(QVariantMap{{"startupDir", ""}});
+        ConfigManager mgr4(path);
+        QCOMPARE(mgr4.startupDir(), QString("last"));
+    }
+
     void testDependencyStartupCheckOptOut()
     {
         QTemporaryDir dir;
