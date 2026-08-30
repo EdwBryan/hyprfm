@@ -295,6 +295,40 @@ private slots:
         QTRY_COMPARE(menu->property("effectiveMenuWidth").toInt(), base);
     }
 
+    // Re-opening the menu while it is already visible and laid out must
+    // render it again. popup() used to wait on menuColumn.onHeightChanged,
+    // which cannot fire when the new menu has the same height, leaving the
+    // menu open but invisible: right-clicks seemed dead and hovering lit up
+    // hidden rows.
+    void testRepopupRendersAnOpenMenu()
+    {
+        App app;
+        QVERIFY(app.load());
+        QQuickItem *menu = app.item("contextMenu");
+        QVERIFY(menu);
+        QQuickItem *container = app.item("contextMenuContainer");
+        QVERIFY(container);
+
+        menu->setProperty("customItems", QVariantList{QVariantMap{
+            {"text", "Open"}, {"action", "noop"}}});
+        QVERIFY(QMetaObject::invokeMethod(menu, "popup", Q_ARG(QVariant, 20), Q_ARG(QVariant, 20)));
+        QTRY_VERIFY2(container->property("opacity").toReal() > 0.99,
+                     qPrintable(QStringLiteral("first popup opacity %1")
+                                    .arg(container->property("opacity").toReal())));
+        // Wait for the first open animation to finish; otherwise a re-popup
+        // could become visible on its own through the still-running animation
+        // and mask the regression. Waiting on the final animated values below
+        // is deterministic across environments and theme timings.
+        QTRY_COMPARE(container->property("opacity").toReal(), 1.0);
+        QTRY_COMPARE(container->property("yOffset").toReal(), 0.0);
+
+        // Second popup, same (same-height) menu, menu already visible.
+        QVERIFY(QMetaObject::invokeMethod(menu, "popup", Q_ARG(QVariant, 60), Q_ARG(QVariant, 60)));
+        QTRY_VERIFY2(container->property("opacity").toReal() > 0.99,
+                     qPrintable(QStringLiteral("re-opened menu opacity %1")
+                                    .arg(container->property("opacity").toReal())));
+    }
+
     void testWheelOverTabStripScrollsTabsInTheFullWindow()
     {
         App app;
