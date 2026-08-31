@@ -1318,6 +1318,22 @@ private slots:
         QCOMPARE(finishSpy.at(0).at(1).toString(), QStringLiteral("password required"));
         QVERIFY2(!QFileInfo::exists(dest),
                  qPrintable(QStringLiteral("left behind: %1").arg(dest)));
+
+        // The retry after a wrong password reuses the same destination, so the
+        // cleanup has to survive more than one attempt.
+        finishSpy.clear();
+        ops.extractArchive(archivePath, dest, QStringLiteral("wrongpass"));
+        QTRY_VERIFY_WITH_TIMEOUT(finishSpy.count() > 0, 10000);
+        QCOMPARE(finishSpy.at(0).at(1).toString(), QStringLiteral("password required"));
+        QVERIFY2(!QFileInfo::exists(dest),
+                 qPrintable(QStringLiteral("retry left behind: %1").arg(dest)));
+
+        // ...and a correct password still extracts into it.
+        finishSpy.clear();
+        ops.extractArchive(archivePath, dest, QStringLiteral("testpass"));
+        QTRY_VERIFY_WITH_TIMEOUT(finishSpy.count() > 0, 10000);
+        QCOMPARE(finishSpy.at(0).at(0).toBool(), true);
+        QVERIFY(QFile::exists(dest + "/payload/inner.txt"));
     }
 
     // Extracting via an external binary must stop promptly when cancelled;

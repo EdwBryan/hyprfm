@@ -2175,8 +2175,11 @@ int FileOperations::extractArchive(const QString &archivePath, const QString &de
     auto cancelled = QSharedPointer<QAtomicInt>::create();
     auto pauseRequested = QSharedPointer<QAtomicInt>::create();
     // Only a folder we made for this archive is ours to clean up on failure;
-    // "Extract Here" unpacks into a directory that was already there.
-    const bool destinationIsOurs = m_ownedExtractionDirs.remove(destination);
+    // "Extract Here" unpacks into a directory that was already there. Kept in
+    // the set rather than consumed: a wrong password retries into the same
+    // destination, and taking the entry on the first attempt would leave every
+    // later refusal behind.
+    const bool destinationIsOurs = m_ownedExtractionDirs.contains(destination);
     return startSimpleOperation(QStringLiteral("Extracting..."), {destination},
         [program, verboseArgs, canList, listProg, listArgs, archivePath, destination,
          processId, cancelled, pauseRequested, byteBased, destinationIsOurs,
