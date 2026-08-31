@@ -44,6 +44,14 @@ bool runningInFlatpak()
 // Total size of all regular files under a directory, used to turn raw
 // extraction output into smooth byte-based progress (7z prints no per-file
 // lines, only an in-place percentage that stalls near the end).
+// Whether anything actually landed. A refused extraction can still leave the
+// directory entries the tool created before it gave up.
+bool dirHasFiles(const QString &dir)
+{
+    QDirIterator it(dir, QDir::Files | QDir::Hidden, QDirIterator::Subdirectories);
+    return it.hasNext();
+}
+
 qint64 dirTotalBytes(const QString &dir)
 {
     qint64 total = 0;
@@ -2166,9 +2174,13 @@ int FileOperations::extractArchive(const QString &archivePath, const QString &de
     auto processId = QSharedPointer<QAtomicInt>::create();
     auto cancelled = QSharedPointer<QAtomicInt>::create();
     auto pauseRequested = QSharedPointer<QAtomicInt>::create();
+    // Only a folder we made for this archive is ours to clean up on failure;
+    // "Extract Here" unpacks into a directory that was already there.
+    const bool destinationIsOurs = m_ownedExtractionDirs.remove(destination);
     return startSimpleOperation(QStringLiteral("Extracting..."), {destination},
         [program, verboseArgs, canList, listProg, listArgs, archivePath, destination,
-         processId, cancelled, pauseRequested, byteBased, this](ProgressReporter report) -> QString {
+         processId, cancelled, pauseRequested, byteBased, destinationIsOurs,
+         this](ProgressReporter report) -> QString {
             QProcess pr;
             qint64 totalUnits = 0;
             if (canList) {
@@ -2249,6 +2261,10 @@ int FileOperations::extractArchive(const QString &archivePath, const QString &de
                 QString output;
                 for (const QByteArray &line : outputLines)
                     output += QString::fromLatin1(line) + QLatin1Char('\n');
+                // Nothing landed, and the folder only exists because we made
+                // it: leave no empty husk next to the archive.
+                if (destinationIsOurs && !dirHasFiles(destination))
+                    QDir(destination).removeRecursively();
                 if (output.contains(QLatin1String("password"), Qt::CaseInsensitive)
                     || output.contains(QLatin1String("passphrase"), Qt::CaseInsensitive)) {
                     // Encrypted archive rejected the password; drop any cached
@@ -2301,6 +2317,7 @@ QString FileOperations::newExtractionFolder(const QString &archivePath)
             ? QStringLiteral("Could not create a folder to extract into") : error);
         return {};
     }
+    m_ownedExtractionDirs.insert(dir);
     return dir;
 }
 

@@ -1291,6 +1291,35 @@ private slots:
         QVERIFY(QFile::exists(extractDir.path() + "/payload/inner.txt"));
     }
 
+    // A refused extraction used to leave the destination behind: unzip creates
+    // the directory entries before it discovers it cannot decrypt anything, so
+    // a bare "locked/payload/" tree appeared next to the archive and looked
+    // like the extraction had half worked.
+    void testRefusedExtractionLeavesNoEmptyFolder()
+    {
+        if (QStandardPaths::findExecutable(QStringLiteral("zip")).isEmpty()
+            || QStandardPaths::findExecutable(QStringLiteral("unzip")).isEmpty())
+            QSKIP("zip/unzip not found in PATH");
+
+        TestDir archiveDir;
+        archiveDir.createDir("payload");
+        archiveDir.createFile("payload/inner.txt", "secret");
+        const QString archivePath = archiveDir.path() + "/locked.zip";
+        QVERIFY(runCommand("zip", {"-q", "-P", "testpass", "-r", archivePath, "payload"},
+                           archiveDir.path()));
+
+        FileOperations ops;
+        const QString dest = ops.newExtractionFolder(archivePath);
+        QVERIFY(!dest.isEmpty());
+        QSignalSpy finishSpy(&ops, &FileOperations::operationFinished);
+
+        ops.extractArchive(archivePath, dest, QString());
+        QTRY_VERIFY_WITH_TIMEOUT(finishSpy.count() > 0, 10000);
+        QCOMPARE(finishSpy.at(0).at(1).toString(), QStringLiteral("password required"));
+        QVERIFY2(!QFileInfo::exists(dest),
+                 qPrintable(QStringLiteral("left behind: %1").arg(dest)));
+    }
+
     // Extracting via an external binary must stop promptly when cancelled;
     // previously the transfer had no worker and the cancel was a no-op that
     // let the extraction run to completion.

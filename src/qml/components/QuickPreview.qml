@@ -35,10 +35,29 @@ Item {
 
     signal closed()
     signal openRequested(string path, bool isDirectory)
-    signal unlockArchiveRequested(string filePath)
+    signal unlockArchiveRequested(string filePath, bool retry)
+
+    // Set while a password the user just typed is being proved by a reload.
+    property bool _unlockPending: false
 
     function reloadAfterUnlock() {
+        root._unlockPending = true
         root.refreshPreviewData()
+    }
+
+    // The preview is the only thing that can tell us a password was wrong on
+    // this path: nothing extracts, so no operation reports back. If the reload
+    // still comes back locked, ask again and say so.
+    onDirectoryPreviewChanged: {
+        if (!root._unlockPending)
+            return
+        if (directoryPreview.requiresPassword === true) {
+            root._unlockPending = false
+            fileOps.clearArchivePassword(root.filePath)
+            root.unlockArchiveRequested(root.filePath, true)
+        } else if ((directoryPreview.entries || []).length > 0) {
+            root._unlockPending = false
+        }
     }
 
     readonly property string fileName: {
@@ -913,7 +932,7 @@ Item {
                                     id: unlockMouse
                                     anchors.fill: parent
                                     hoverEnabled: true
-                                    onClicked: root.unlockArchiveRequested(root.filePath)
+                                    onClicked: root.unlockArchiveRequested(root.filePath, false)
                                 }
                             }
 

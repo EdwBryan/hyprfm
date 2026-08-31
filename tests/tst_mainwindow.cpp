@@ -384,6 +384,36 @@ private slots:
                                     .arg(app.window->height())));
     }
 
+    // Q.Dialog.open() used to leave a close animation running, and that
+    // animation ends by setting visible = false. Reopening during one — the
+    // archive password dialog asking again after the password was rejected —
+    // put the dialog up and then tore it straight back down.
+    void testDialogReopenedWhileClosingStaysUp()
+    {
+        App app;
+        QVERIFY(app.load());
+        QQuickItem *dialog = app.item("archivePasswordDialog");
+        QVERIFY(dialog);
+
+        QVERIFY(QMetaObject::invokeMethod(dialog, "openFor",
+                                          Q_ARG(QVariant, QStringLiteral("/tmp/x.7z")),
+                                          Q_ARG(QVariant, false)));
+        QTRY_VERIFY(dialog->isVisible());
+
+        // Close and reopen immediately, without waiting for the animation.
+        QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
+        QVERIFY(QMetaObject::invokeMethod(dialog, "openFor",
+                                          Q_ARG(QVariant, QStringLiteral("/tmp/x.7z")),
+                                          Q_ARG(QVariant, true)));
+
+        // Long enough for the old close animation to have finished and blanked
+        // the dialog, if it were still running.
+        QTest::qWait(400);
+        QVERIFY2(dialog->isVisible(), "reopening during the close animation lost the dialog");
+        QCOMPARE(dialog->property("errorText").toString(),
+                 QStringLiteral("That password did not work. Try again."));
+    }
+
     void testWheelOverTabStripScrollsTabsInTheFullWindow()
     {
         App app;

@@ -154,6 +154,11 @@ private:
 
     // path -> password, kept for this session only.
     QHash<QString, QString> m_archivePasswords;
+
+    // Folders newExtractionFolder() made. Only these are ours to remove when
+    // an extraction fails without unpacking anything: "Extract Here" targets a
+    // directory the user already had.
+    QSet<QString> m_ownedExtractionDirs;
     void emitAggregatedState();
     ActiveTransfer *findTransfer(int id);
 

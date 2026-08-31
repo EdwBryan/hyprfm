@@ -1254,6 +1254,7 @@ ApplicationWindow {
 
     ArchivePasswordDialog {
         id: archivePasswordDialog
+        objectName: "archivePasswordDialog"
         onConfirmed: (password) => root.handleArchivePasswordConfirmed(password)
         onRejected: root.passwordDialogContext = null
     }
@@ -3860,9 +3861,9 @@ ApplicationWindow {
                 recentFiles.addRecent(path)
             }
         }
-        onUnlockArchiveRequested: (path) => {
+        onUnlockArchiveRequested: (path, retry) => {
             root.passwordDialogContext = { path: path, dest: "" }
-            archivePasswordDialog.openFor(path, false)
+            archivePasswordDialog.openFor(path, retry)
         }
         onClosed: {
             quickPreview.active = false
