@@ -2285,6 +2285,15 @@ int FileOperations::extractArchive(const QString &archivePath, const QString &de
                 }
                 return QStringLiteral("Extraction failed");
             }
+            // The archive is done with; the password goes with it. Held only
+            // for as long as it is being used, the way Ark and File Roller
+            // scope it to the archive you currently have open.
+            {
+                const QString archive = archivePath;
+                QMetaObject::invokeMethod(this, [this, archive]() {
+                    clearArchivePassword(archive);
+                }, Qt::QueuedConnection);
+            }
             return {};
         }, processId, cancelled, pauseRequested);
 }

@@ -81,7 +81,9 @@ public:
     Q_INVOKABLE int extractArchive(const QString &archivePath, const QString &destination);
     Q_INVOKABLE int extractArchive(const QString &archivePath, const QString &destination,
                                    const QString &password);
-    // Session-only, in-memory password cache for archives. Never persisted.
+    // In-memory only, never persisted, and held only while the archive is in
+    // use: an extraction clears it when it finishes, and the preview clears it
+    // when it moves off the file. Same scope Ark and File Roller use.
     Q_INVOKABLE QString archivePassword(const QString &archivePath) const;
     Q_INVOKABLE void cacheArchivePassword(const QString &archivePath, const QString &password);
     Q_INVOKABLE void clearArchivePassword(const QString &archivePath);
@@ -152,7 +154,7 @@ private:
                               const QSharedPointer<QAtomicInt> &pauseRequested = {});
     void cleanupTransfer(int transferId);
 
-    // path -> password, kept for this session only.
+    // path -> password, for as long as that archive is in use.
     QHash<QString, QString> m_archivePasswords;
 
     // Folders newExtractionFolder() made. Only these are ours to remove when

@@ -41,6 +41,18 @@ Item {
     // Set while a password the user just typed is being proved by a reload.
     property bool _unlockPending: false
 
+    // The archive this preview unlocked, if any. The password lives only as
+    // long as the preview showing it, so moving to another file or closing
+    // the overlay forgets it, the way Ark and File Roller do.
+    property string _unlockedPath: ""
+
+    function _forgetUnlockedArchive() {
+        if (root._unlockedPath === "")
+            return
+        fileOps.clearArchivePassword(root._unlockedPath)
+        root._unlockedPath = ""
+    }
+
     function reloadAfterUnlock() {
         root._unlockPending = true
         root.refreshPreviewData()
@@ -58,6 +70,7 @@ Item {
             root.unlockArchiveRequested(root.filePath, true)
         } else if ((directoryPreview.entries || []).length > 0) {
             root._unlockPending = false
+            root._unlockedPath = root.filePath
             root.unlockSucceeded()
         }
     }
@@ -281,6 +294,7 @@ Item {
             openAnim.start()
             Qt.callLater(function() { root.forceActiveFocus() })
         } else if (visible) {
+            root._forgetUnlockedArchive()
             // Closing: stop any in-flight worker from doing pointless work
             // and from repainting a panel the user is no longer looking at.
             previewLoader.stop()
@@ -290,6 +304,9 @@ Item {
         }
     }
     onFilePathChanged: {
+        // Moving to another file ends the unlocked archive's life.
+        if (root._unlockedPath !== "" && root._unlockedPath !== root.filePath)
+            root._forgetUnlockedArchive()
         pdfHoldSource = ""
         pdfPageIndex = 0
         pdfWheelAccumulator = 0

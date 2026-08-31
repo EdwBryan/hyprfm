@@ -1330,10 +1330,15 @@ private slots:
 
         // ...and a correct password still extracts into it.
         finishSpy.clear();
+        ops.cacheArchivePassword(archivePath, QStringLiteral("testpass"));
         ops.extractArchive(archivePath, dest, QStringLiteral("testpass"));
         QTRY_VERIFY_WITH_TIMEOUT(finishSpy.count() > 0, 10000);
         QCOMPARE(finishSpy.at(0).at(0).toBool(), true);
         QVERIFY(QFile::exists(dest + "/payload/inner.txt"));
+
+        // The archive is done with, so the password does not outlive it: held
+        // only while in use, the way Ark and File Roller scope it.
+        QTRY_VERIFY(ops.archivePassword(archivePath).isEmpty());
     }
 
     // Extracting via an external binary must stop promptly when cancelled;
