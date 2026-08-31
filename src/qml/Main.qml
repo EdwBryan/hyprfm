@@ -599,24 +599,17 @@ ApplicationWindow {
         // Wait for this operation's id, not for whichever transfer finishes
         // next; several can run at once.
         var opId = -1
-        var onFinished = null
-        if (clearClipboardOnSuccess) {
-            onFinished = function(success, error, id) {
-                if (id !== opId) return
-                fileOps.operationFinished.disconnect(onFinished)
-                if (success)
-                    clipboard.clear()
-            }
-            fileOps.operationFinished.connect(onFinished)
-        }
-
         if (usesRemotePath)
             opId = moveOperation ? fileOps.moveResolvedItems(items) : fileOps.copyResolvedItems(items)
         else
             opId = moveOperation ? undoManager.moveResolvedItems(items) : undoManager.copyResolvedItems(items)
 
-        if (onFinished && opId < 0)   // failed before it started; nothing will call back
-            fileOps.operationFinished.disconnect(onFinished)
+        if (clearClipboardOnSuccess) {
+            root.whenOperationFinishes(opId, function(success, error) {
+                if (success)
+                    clipboard.clear()
+            })
+        }
     }
 
     function openTransferConflict(index) {
@@ -3322,6 +3315,21 @@ ApplicationWindow {
         return []
     }
 
+    // Callbacks waiting on one operation's id. A JS
+    // fileOps.operationFinished.connect(function(success, error, id)) never
+    // receives that third argument — only a Connections handler does — so
+    // every such callback compared `undefined` against its id and silently
+    // never ran. Everything waiting on a specific operation goes through here.
+    property var _operationCallbacks: ({})
+
+    function whenOperationFinishes(opId, callback) {
+        if (opId < 0)
+            return
+        var pending = root._operationCallbacks
+        pending[opId] = callback
+        root._operationCallbacks = pending
+    }
+
     function handlePaneFileActivated(pane, filePath, isDirectory) {
         root.setActivePane(pane)
 
@@ -3348,9 +3356,7 @@ ApplicationWindow {
         var opId = fileOps.extractArchive(archivePath, dest, password)
         if (opId < 0)
             return
-        var onFinished = function(success, error, id) {
-            if (id !== opId) return
-            fileOps.operationFinished.disconnect(onFinished)
+        root.whenOperationFinishes(opId, function(success, error) {
             if (success) {
                 // Whatever password got us here was the right one, so the
                 // prompt (still open while it was being proved) is done.
@@ -3363,8 +3369,7 @@ ApplicationWindow {
                 else
                     root.navigateActivePaneTo(dest)
             }
-        }
-        fileOps.operationFinished.connect(onFinished)
+        })
     }
 
     // Asking may be a first ask (open the dialog) or the answer to one the
@@ -3911,10 +3916,18 @@ ApplicationWindow {
             root.askArchivePassword(archivePath, destination, retry)
         }
 
-        function onOperationFinished(success, error) {
+        function onOperationFinished(success, error, operationId) {
             fsModel.refresh()
             splitFsModel.refresh()
             root.updateSelectionStatus()
+
+            var waiting = root._operationCallbacks[operationId]
+            if (waiting !== undefined) {
+                var pending = root._operationCallbacks
+                delete pending[operationId]
+                root._operationCallbacks = pending
+                waiting(success, error)
+            }
             if (propertiesDialog.visible && propertiesDialog.props.path) {
                 propertiesDialog.props = propertiesDialog.fileModelRef.fileProperties(propertiesDialog.props.path)
                 propertiesDialog.refreshFolderDiskUsage()

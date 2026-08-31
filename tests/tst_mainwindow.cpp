@@ -412,6 +412,54 @@ private slots:
         QTRY_VERIFY(!dialog->isVisible());
     }
 
+    // The whole password flow end to end: activating an encrypted archive
+    // fails, the prompt opens, and the password the user types must extract it
+    // AND dismiss the prompt. The dialog sat on "Checking..." forever when the
+    // success never made it back.
+    void testCorrectPasswordExtractsAndDismissesThePrompt()
+    {
+        if (QStandardPaths::findExecutable(QStringLiteral("7z")).isEmpty())
+            QSKIP("7z not found in PATH");
+
+        App app;
+        QVERIFY(app.load());
+
+        const QString dir = app.home.path();
+        QDir().mkpath(dir + "/payload");
+        QFile f(dir + "/payload/inner.txt");
+        QVERIFY(f.open(QIODevice::WriteOnly));
+        f.write("secret");
+        f.close();
+        QProcess zip;
+        zip.setWorkingDirectory(dir);
+        zip.start("7z", {"a", "-ptest", "-mhe=on", dir + "/locked.7z", "payload"});
+        QVERIFY(zip.waitForFinished(20000));
+        QCOMPARE(zip.exitCode(), 0);
+
+        QQuickItem *dialog = app.item("archivePasswordDialog");
+        QVERIFY(dialog);
+
+        QVERIFY(QMetaObject::invokeMethod(app.window->contentItem()->parent(),
+                                          "handlePaneFileActivated",
+                                          Q_ARG(QVariant, QStringLiteral("primary")),
+                                          Q_ARG(QVariant, dir + "/locked.7z"),
+                                          Q_ARG(QVariant, false)));
+
+        QTRY_VERIFY_WITH_TIMEOUT(dialog->isVisible(), 15000);
+        QVERIFY(QMetaObject::invokeMethod(dialog, "openFor", Q_ARG(QVariant, dir + "/locked.7z")));
+        QTRY_VERIFY(dialog->isVisible());
+        dialog->setProperty("filePath", dir + "/locked.7z");
+
+        // Type the right password and submit, as the user would.
+        QQuickItem *field = app.item("archivePasswordField");
+        QVERIFY2(field, "password field not found");
+        field->setProperty("text", QStringLiteral("test"));
+        QVERIFY(QMetaObject::invokeMethod(dialog, "submit"));
+
+        QTRY_VERIFY_WITH_TIMEOUT(!dialog->isVisible(), 20000);
+        QCOMPARE(dialog->property("checking").toBool(), false);
+    }
+
     void testWheelOverTabStripScrollsTabsInTheFullWindow()
     {
         App app;

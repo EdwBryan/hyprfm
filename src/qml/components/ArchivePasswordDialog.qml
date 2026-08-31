@@ -66,6 +66,7 @@ Q.Dialog {
 
     Q.TextField {
         id: passwordField
+        objectName: "archivePasswordField"
         Layout.fillWidth: true
         variant: "filled"
         placeholder: "Password"
