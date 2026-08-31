@@ -384,11 +384,10 @@ private slots:
                                     .arg(app.window->height())));
     }
 
-    // Q.Dialog.open() used to leave a close animation running, and that
-    // animation ends by setting visible = false. Reopening during one — the
-    // archive password dialog asking again after the password was rejected —
-    // put the dialog up and then tore it straight back down.
-    void testDialogReopenedWhileClosingStaysUp()
+    // A refused password used to close the prompt and reopen it, which read as
+    // a flicker and threw away what was typed. The dialog now stays up and
+    // reports in place, and only a password that actually worked closes it.
+    void testWrongArchivePasswordKeepsThePromptOpen()
     {
         App app;
         QVERIFY(app.load());
@@ -396,22 +395,21 @@ private slots:
         QVERIFY(dialog);
 
         QVERIFY(QMetaObject::invokeMethod(dialog, "openFor",
-                                          Q_ARG(QVariant, QStringLiteral("/tmp/x.7z")),
-                                          Q_ARG(QVariant, false)));
+                                          Q_ARG(QVariant, QStringLiteral("/tmp/x.7z"))));
         QTRY_VERIFY(dialog->isVisible());
+        QVERIFY(dialog->property("errorText").toString().isEmpty());
 
-        // Close and reopen immediately, without waiting for the animation.
-        QVERIFY(QMetaObject::invokeMethod(dialog, "close"));
-        QVERIFY(QMetaObject::invokeMethod(dialog, "openFor",
-                                          Q_ARG(QVariant, QStringLiteral("/tmp/x.7z")),
-                                          Q_ARG(QVariant, true)));
-
-        // Long enough for the old close animation to have finished and blanked
-        // the dialog, if it were still running.
+        QVERIFY(QMetaObject::invokeMethod(dialog, "failed"));
+        // Long enough that a close animation would have finished and hidden it.
         QTest::qWait(400);
-        QVERIFY2(dialog->isVisible(), "reopening during the close animation lost the dialog");
+        QVERIFY2(dialog->isVisible(), "the prompt closed on a wrong password");
         QCOMPARE(dialog->property("errorText").toString(),
-                 QStringLiteral("That password did not work. Try again."));
+                 QStringLiteral("Wrong password. Try again."));
+        QCOMPARE(dialog->property("checking").toBool(), false);
+
+        // Only success dismisses it.
+        QVERIFY(QMetaObject::invokeMethod(dialog, "succeeded"));
+        QTRY_VERIFY(!dialog->isVisible());
     }
 
     void testWheelOverTabStripScrollsTabsInTheFullWindow()

@@ -3352,6 +3352,12 @@ ApplicationWindow {
             if (id !== opId) return
             fileOps.operationFinished.disconnect(onFinished)
             if (success) {
+                // Whatever password got us here was the right one, so the
+                // prompt (still open while it was being proved) is done.
+                if (archivePasswordDialog.visible) {
+                    root.passwordDialogContext = null
+                    archivePasswordDialog.succeeded()
+                }
                 if (pane)
                     root.navigatePaneTo(pane, dest)
                 else
@@ -3361,9 +3367,20 @@ ApplicationWindow {
         fileOps.operationFinished.connect(onFinished)
     }
 
+    // Asking may be a first ask (open the dialog) or the answer to one the
+    // user just gave (report into the dialog already up, without closing it).
+    function askArchivePassword(path, dest, retry) {
+        root.passwordDialogContext = { path: path, dest: dest }
+        if (retry && archivePasswordDialog.visible)
+            archivePasswordDialog.failed()
+        else
+            archivePasswordDialog.openFor(path)
+    }
+
     function handleArchivePasswordConfirmed(password) {
+        // Kept, not cleared: the dialog stays open until the password is
+        // proved, and a refusal asks again for this same archive.
         var ctx = root.passwordDialogContext
-        root.passwordDialogContext = null
         if (!ctx || !ctx.path)
             return
         fileOps.cacheArchivePassword(ctx.path, password)
@@ -3862,8 +3879,11 @@ ApplicationWindow {
             }
         }
         onUnlockArchiveRequested: (path, retry) => {
-            root.passwordDialogContext = { path: path, dest: "" }
-            archivePasswordDialog.openFor(path, retry)
+            root.askArchivePassword(path, "", retry)
+        }
+        onUnlockSucceeded: {
+            root.passwordDialogContext = null
+            archivePasswordDialog.succeeded()
         }
         onClosed: {
             quickPreview.active = false
@@ -3888,8 +3908,7 @@ ApplicationWindow {
         }
 
         function onPasswordRequested(archivePath, destination, retry) {
-            root.passwordDialogContext = { path: archivePath, dest: destination }
-            archivePasswordDialog.openFor(archivePath, retry)
+            root.askArchivePassword(archivePath, destination, retry)
         }
 
         function onOperationFinished(success, error) {

@@ -19,25 +19,47 @@ Q.Dialog {
         return parts[parts.length - 1] || root.filePath
     }
     property string errorText: ""
+    // A password has been handed over and we are waiting to hear whether it
+    // worked. The dialog stays up throughout: closing and reopening it on a
+    // wrong password reads as a flicker and loses what you typed.
+    property bool checking: false
 
     signal confirmed(string password)
 
-    function openFor(path, retry) {
+    function openFor(path) {
         root.filePath = path
-        root.errorText = retry ? "That password did not work. Try again." : ""
+        root.errorText = ""
+        root.checking = false
         passwordField.text = ""
         root.open()
     }
 
+    // The password was refused. Stay open, say so, and offer the field back
+    // with the failed attempt selected so typing replaces it.
+    function failed() {
+        root.checking = false
+        root.errorText = "Wrong password. Try again."
+        passwordField.inputItem.forceActiveFocus()
+        passwordField.inputItem.selectAll()
+    }
+
+    // The password worked; nothing left to ask.
+    function succeeded() {
+        root.checking = false
+        root.accept()
+    }
+
     function submit() {
+        if (root.checking)
+            return
         root.errorText = ""
         var pass = passwordField.text
         if (pass === "") {
             root.errorText = "Enter the archive password."
             return
         }
+        root.checking = true
         root.confirmed(pass)
-        root.accept()
     }
 
     onOpened: Qt.callLater(function() { passwordField.inputItem.forceActiveFocus() })
@@ -48,6 +70,7 @@ Q.Dialog {
         variant: "filled"
         placeholder: "Password"
         echoMode: TextInput.Password
+        enabled: !root.checking
         inputItem.Keys.onReturnPressed: root.submit()
         onTextChanged: root.errorText = ""
     }
@@ -73,9 +96,10 @@ Q.Dialog {
         }
 
         Q.Button {
-            text: "Unlock"
+            text: root.checking ? "Checking\u2026" : "Unlock"
             variant: "primary"
             size: "small"
+            enabled: !root.checking
             onClicked: root.submit()
         }
     }

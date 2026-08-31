@@ -36,6 +36,7 @@ Item {
     signal closed()
     signal openRequested(string path, bool isDirectory)
     signal unlockArchiveRequested(string filePath, bool retry)
+    signal unlockSucceeded()
 
     // Set while a password the user just typed is being proved by a reload.
     property bool _unlockPending: false
@@ -57,6 +58,7 @@ Item {
             root.unlockArchiveRequested(root.filePath, true)
         } else if ((directoryPreview.entries || []).length > 0) {
             root._unlockPending = false
+            root.unlockSucceeded()
         }
     }
 
