@@ -3368,7 +3368,11 @@ ApplicationWindow {
         fileOps.cacheArchivePassword(ctx.path, password)
         if (ctx.dest)
             root.trackArchiveExtraction(null, ctx.path, ctx.dest, password)
-        quickPreview.reloadAfterUnlock()
+        // Only when the preview is actually on screen: the dialog also opens
+        // from an extraction, where reloading would run a preview nobody asked
+        // for, on whatever file the closed overlay was last pointed at.
+        if (quickPreview.active)
+            quickPreview.reloadAfterUnlock()
     }
 
     function showContextMenuForPane(pane, filePath, isDirectory, position) {
@@ -3858,7 +3862,7 @@ ApplicationWindow {
         }
         onUnlockArchiveRequested: (path) => {
             root.passwordDialogContext = { path: path, dest: "" }
-            archivePasswordDialog.openFor(path)
+            archivePasswordDialog.openFor(path, false)
         }
         onClosed: {
             quickPreview.active = false
@@ -3882,9 +3886,9 @@ ApplicationWindow {
                 propertiesDialog.refreshFolderDiskUsage()
         }
 
-        function onPasswordRequested(archivePath, destination) {
+        function onPasswordRequested(archivePath, destination, retry) {
             root.passwordDialogContext = { path: archivePath, dest: destination }
-            archivePasswordDialog.openFor(archivePath)
+            archivePasswordDialog.openFor(archivePath, retry)
         }
 
         function onOperationFinished(success, error) {

@@ -1,4 +1,5 @@
 #include "services/fileoperations.h"
+#include "services/archivepassword.h"
 #include "services/giotransferworker.h"
 #include "services/xdgtrash.h"
 #include <QBuffer>
@@ -787,17 +788,6 @@ ArchiveKind archiveKindForPath(const QString &path)
     if (lower.endsWith(QStringLiteral(".bz2")))
         return ArchiveKind::Bz2;
     return ArchiveKind::None;
-}
-
-// "Password" handed to unzip/7z when none is known yet. It is deliberately
-// wrong, and long enough that no real password collides with it; it keeps the
-// tools from prompting on stdin, so the app never blocks waiting for input
-// nobody will type. Encrypted archives just fail fast instead.
-const QLatin1String archivePasswordSentinel("__hyprfm_placeholder_password__");
-
-QString effectiveArchivePassword(const QString &password)
-{
-    return password.isEmpty() ? archivePasswordSentinel : password;
 }
 
 bool archiveExtractCommand(const QString &archivePath, const QString &destination,
@@ -2132,6 +2122,10 @@ int FileOperations::compressFiles(const QStringList &paths, const QString &forma
             if (cancelled->loadRelaxed() && pr.state() != QProcess::NotRunning)
                 pr.kill();
             pr.waitForFinished(5000);
+            // Forget the pid the moment the process is gone: cancelTransfer(-1)
+            // walks every transfer, including ones whose subprocess has exited
+            // but whose cleanup has not run, and the OS recycles pids.
+            processId->storeRelaxed(0);
             if (pr.exitCode() != 0)
                 return QStringLiteral("Compression failed");
             return {};
@@ -2247,6 +2241,10 @@ int FileOperations::extractArchive(const QString &archivePath, const QString &de
             if (cancelled->loadRelaxed() && pr.state() != QProcess::NotRunning)
                 pr.kill();
             pr.waitForFinished(5000);
+            // Forget the pid the moment the process is gone: cancelTransfer(-1)
+            // walks every transfer, including ones whose subprocess has exited
+            // but whose cleanup has not run, and the OS recycles pids.
+            processId->storeRelaxed(0);
             if (pr.exitCode() != 0) {
                 QString output;
                 for (const QByteArray &line : outputLines)
@@ -2258,8 +2256,11 @@ int FileOperations::extractArchive(const QString &archivePath, const QString &de
                     const QString archive = archivePath;
                     const QString dest = destination;
                     QMetaObject::invokeMethod(this, [this, archive, dest]() {
+                        // Read before clearing: a password that was already
+                        // set and still failed is a wrong one, not a first ask.
+                        const bool retry = !archivePassword(archive).isEmpty();
                         clearArchivePassword(archive);
-                        emit passwordRequested(archive, dest);
+                        emit passwordRequested(archive, dest, retry);
                     }, Qt::QueuedConnection);
                     return QStringLiteral("password required");
                 }

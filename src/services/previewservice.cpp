@@ -1,4 +1,5 @@
 #include "services/previewservice.h"
+#include "services/archivepassword.h"
 
 #include "services/metadataextractor.h"
 
@@ -347,7 +348,7 @@ void PreviewService::cancelPreview(const QString &requester)
 }
 
 void PreviewService::requestPreview(const QString &requester, const QString &path,
-                                    const QString &kind)
+                                    const QString &kind, const QString &password)
 {
     const quint64 generation = bumpGeneration(requester);
 
@@ -356,8 +357,8 @@ void PreviewService::requestPreview(const QString &requester, const QString &pat
         return;
     }
 
-    m_pool->start([this, requester, path, kind, generation]() {
-        const QVariantMap data = buildPreview(path, kind);
+    m_pool->start([this, requester, path, kind, password, generation]() {
+        const QVariantMap data = buildPreview(path, kind, password);
 
         // Cheap early-out so a superseded worker doesn't queue a no-op onto
         // the GUI thread. The authoritative check is the one inside the
@@ -373,7 +374,8 @@ void PreviewService::requestPreview(const QString &requester, const QString &pat
     });
 }
 
-QVariantMap PreviewService::buildPreview(const QString &path, const QString &kind) const
+QVariantMap PreviewService::buildPreview(const QString &path, const QString &kind,
+                                         const QString &password) const
 {
     QVariantMap data;
 
@@ -382,7 +384,7 @@ QVariantMap PreviewService::buildPreview(const QString &path, const QString &kin
     else if (kind == QLatin1String("pdf"))
         data["pdf"] = loadPdfPreview(path);
     else if (kind == QLatin1String("archive"))
-        data["archive"] = loadArchivePreview(path);
+        data["archive"] = loadArchivePreview(path, 200, password);
     else if (kind == QLatin1String("directory"))
         data["directory"] = loadDirectoryPreview(path);
 
@@ -501,12 +503,8 @@ QVariantMap PreviewService::loadArchivePreview(const QString &path, int maxEntri
 } else if (lower.endsWith(".7z") || lower.endsWith(".rar")) {
         // Always pass -p so 7z never waits for interactive input: an archive
         // without a password ignores it, an encrypted one fails immediately.
-        // The sentinel (kept in sync with fileoperations.cpp) is long enough
-        // that no real password collides with it.
         program = "7z";
-        const QString pass = password.isEmpty()
-            ? QLatin1String("__hyprfm_placeholder_password__") : password;
-        args = {"l", "-slt", "-p" + pass, path};
+        args = {"l", "-slt", "-p" + effectiveArchivePassword(password), path};
     } else {
         result["error"] = "Unsupported archive format";
         return result;

@@ -104,7 +104,10 @@ signals:
     void pathsChanged(const QStringList &paths);
     // An encrypted archive rejected the current password; the UI should ask
     // the user and retry extractArchive() with the password it gets.
-    void passwordRequested(const QString &archivePath, const QString &destination);
+    // `retry` is true when a password had already been supplied and was
+    // wrong, so the dialog can say so instead of reopening unchanged.
+    void passwordRequested(const QString &archivePath, const QString &destination,
+                           bool retry);
     // operationId matches the value returned by the operation that started
     // it (-1 for synchronous failures), so callers waiting on one operation
     // are not satisfied by another one finishing first.

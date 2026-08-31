@@ -22,9 +22,9 @@ Q.Dialog {
 
     signal confirmed(string password)
 
-    function openFor(path) {
+    function openFor(path, retry) {
         root.filePath = path
-        root.errorText = ""
+        root.errorText = retry ? "That password did not work. Try again." : ""
         passwordField.text = ""
         root.open()
     }

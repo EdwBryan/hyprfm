@@ -35,8 +35,11 @@ public:
     // requester: the quick-preview overlay and the Miller preview column
     // share this one service, and a global counter would let either cancel
     // the other's in-flight work and leave it blank forever.
+    // `password` only applies to encrypted archives; every other kind
+    // ignores it.
     Q_INVOKABLE void requestPreview(const QString &requester, const QString &path,
-                                    const QString &kind);
+                                    const QString &kind,
+                                    const QString &password = QString());
 
     // Invalidates that requester's in-flight work without starting more.
     Q_INVOKABLE void cancelPreview(const QString &requester);
@@ -68,7 +71,8 @@ private:
     // Runs on a worker thread. Excludes font previews on purpose:
     // QFontDatabase is GUI-thread-only, so QML still calls loadFontPreview
     // directly (it is a local file read, not a subprocess).
-    QVariantMap buildPreview(const QString &path, const QString &kind) const;
+    QVariantMap buildPreview(const QString &path, const QString &kind,
+                             const QString &password) const;
 
     QByteArray readPathBytes(const QString &path, qint64 maxBytes, bool *truncated,
                              QString *error) const;

@@ -1225,13 +1225,66 @@ private slots:
         ops.extractArchive(archivePath, extractDir.path(), QString());
 
         QVERIFY(passwordSpy.wait(5000));
-        QCOMPARE(finishSpy.count(), 1);
+        // Queued from the worker before it returns, so passwordRequested lands
+        // ahead of operationFinished. Wait rather than assume the order.
+        QTRY_COMPARE(finishSpy.count(), 1);
         QCOMPARE(finishSpy.at(0).at(0).toBool(), false);
         QCOMPARE(finishSpy.at(0).at(1).toString(), QStringLiteral("password required"));
         QVERIFY(!QFile::exists(extractDir.path() + "/payload/inner.txt"));
 
         finishSpy.clear();
         ops.extractArchive(archivePath, extractDir.path(), QStringLiteral("test"));
+
+        QVERIFY(finishSpy.wait(5000));
+        QCOMPARE(finishSpy.at(0).at(0).toBool(), true);
+        QVERIFY(QFile::exists(extractDir.path() + "/payload/inner.txt"));
+    }
+
+    // Same contract as the 7z case, through unzip, which is present far more
+    // often than 7z (the runner has it and p7zip is a separate install). Keeps
+    // the password path covered even where the 7z tests skip.
+    void testExtractPasswordProtectedZip()
+    {
+        if (QStandardPaths::findExecutable(QStringLiteral("zip")).isEmpty()
+            || QStandardPaths::findExecutable(QStringLiteral("unzip")).isEmpty())
+            QSKIP("zip/unzip not found in PATH");
+
+        TestDir archiveDir;
+        TestDir extractDir;
+        archiveDir.createDir("payload");
+        archiveDir.createFile("payload/inner.txt", "secret");
+        const QString archivePath = archiveDir.path() + "/locked.zip";
+        QVERIFY(runCommand("zip", {"-q", "-P", "testpass", "-r", archivePath, "payload"},
+                           archiveDir.path()));
+        QVERIFY(QFile::exists(archivePath));
+
+        FileOperations ops;
+        QSignalSpy finishSpy(&ops, &FileOperations::operationFinished);
+        QSignalSpy passwordSpy(&ops, &FileOperations::passwordRequested);
+
+        ops.extractArchive(archivePath, extractDir.path(), QString());
+
+        QVERIFY(passwordSpy.wait(5000));
+        // First ask: nothing was cached, so this is not a retry.
+        QCOMPARE(passwordSpy.constFirst().at(2).toBool(), false);
+        // passwordRequested is queued from the worker before it returns, so it
+        // lands ahead of operationFinished. Wait rather than assume the order.
+        QTRY_COMPARE(finishSpy.count(), 1);
+        QCOMPARE(finishSpy.at(0).at(1).toString(), QStringLiteral("password required"));
+        QVERIFY(!QFile::exists(extractDir.path() + "/payload/inner.txt"));
+
+        // A wrong password must come back as a retry, so the dialog can say so.
+        ops.cacheArchivePassword(archivePath, QStringLiteral("wrongpass"));
+        passwordSpy.clear();
+        finishSpy.clear();
+        ops.extractArchive(archivePath, extractDir.path(), QStringLiteral("wrongpass"));
+
+        QVERIFY(passwordSpy.wait(5000));
+        QCOMPARE(passwordSpy.constFirst().at(2).toBool(), true);
+        QVERIFY(ops.archivePassword(archivePath).isEmpty());
+
+        finishSpy.clear();
+        ops.extractArchive(archivePath, extractDir.path(), QStringLiteral("testpass"));
 
         QVERIFY(finishSpy.wait(5000));
         QCOMPARE(finishSpy.at(0).at(0).toBool(), true);
